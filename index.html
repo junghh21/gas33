@@ -7,8 +7,11 @@
     <title>가스기사 학습 엔진 v2.5</title>
     <!-- Tailwind CSS (Play CDN) -->
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
-    <!-- KaTeX CSS (cdnjs 사용하여 추적 방지 우회 및 로드 안정성 확보) -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" crossorigin="anonymous">
+    <!-- KaTeX CSS - Improved security attributes to bypass tracking prevention -->
+    <link rel="stylesheet" 
+          href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" 
+          crossorigin="anonymous"
+          referrerpolicy="no-referrer">
 <script type="importmap">
 {
   "imports": {
@@ -46,6 +49,12 @@
     }
     .dark .prose thead th {
         background-color: rgba(37, 99, 235, 0.1);
+    }
+    /* Ensure body is visible and transitions smoothly */
+    body {
+        opacity: 1;
+        visibility: visible;
+        transition: opacity 0.3s ease;
     }
 </style>
 </head>

@@ -2,8 +2,9 @@
 import { GoogleGenAI } from "@google/genai";
 
 export const generateExplanation = async (topic: string, question?: string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const model = 'gemini-3-flash-preview';
+  // Always create a new instance to ensure we use the correct API key
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+  const modelName = 'gemini-3-flash-preview';
   
   const systemInstruction = `
     당신은 가스기사(Gas Engineer) 자격증 시험 전문 튜터입니다.
@@ -24,7 +25,7 @@ export const generateExplanation = async (topic: string, question?: string) => {
 
   try {
     const response = await ai.models.generateContent({
-      model: model,
+      model: modelName,
       contents: prompt,
       config: {
         systemInstruction,
@@ -34,12 +35,12 @@ export const generateExplanation = async (topic: string, question?: string) => {
     return response.text || "답변을 생성하지 못했습니다.";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "AI 튜터와 연결하는 중 오류가 발생했습니다.";
+    return "AI 튜터와 연결하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
   }
 };
 
 export const startAIChat = (systemInstruction: string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
   return ai.chats.create({
     model: 'gemini-3-flash-preview',
     config: { systemInstruction }

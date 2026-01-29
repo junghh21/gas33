@@ -12,37 +12,41 @@ const MarkdownRenderer: React.FC<Props> = ({ content, className = "" }) => {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (rootRef.current) {
-      // 1. marked 기본 설정
+    let isMounted = true;
+
+    const renderContent = async () => {
+      if (!rootRef.current) return;
+
+      // marked configuration
       marked.setOptions({
         breaks: true,
         gfm: true
       });
 
-      // 2. 마크다운 -> HTML 변환 및 수식 렌더링 실행
       try {
-        const rawHtml = marked.parse(content);
+        const rawHtml = await marked.parse(content);
         
-        if (typeof rawHtml === 'string') {
+        if (isMounted && rootRef.current) {
           rootRef.current.innerHTML = rawHtml;
           applyKaTeX(rootRef.current);
-        } else if (rawHtml instanceof Promise) {
-          rawHtml.then(html => {
-            if (rootRef.current) {
-              rootRef.current.innerHTML = html;
-              applyKaTeX(rootRef.current);
-            }
-          });
         }
       } catch (e) {
         console.error("Markdown rendering error:", e);
-        if (rootRef.current) rootRef.current.innerText = content;
+        if (isMounted && rootRef.current) {
+          rootRef.current.innerText = content;
+        }
       }
-    }
+    };
+
+    renderContent();
+
+    return () => {
+      isMounted = false;
+    };
   }, [content]);
 
-  // KaTeX 자동 렌더링 함수
   const applyKaTeX = (element: HTMLElement) => {
+    if (!element) return;
     try {
       renderMathInElement(element, {
         delimiters: [
@@ -55,7 +59,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content, className = "" }) => {
         ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
       });
     } catch (err) {
-      console.error("KaTeX error:", err);
+      console.warn("KaTeX auto-render failed:", err);
     }
   };
 
