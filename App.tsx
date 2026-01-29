@@ -19,13 +19,15 @@ const App: React.FC = () => {
     return saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
   });
 
+  const totalQuestions = SUBJECTS.reduce((acc, curr) => acc + curr.h4Count, 0);
+
   const log = (msg: string) => {
     console.log(`[App] ${msg}`);
     setDebugLog(prev => [msg, ...prev].slice(0, 5));
   };
 
   useEffect(() => {
-    log(`Initialized v${APP_VERSION} (Dark: ${isDarkMode})`);
+    localStorage.setItem('gas-engine-theme', isDarkMode ? 'dark' : 'light');
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
     } else {
@@ -34,19 +36,15 @@ const App: React.FC = () => {
   }, [isDarkMode]);
 
   const fetchSubjectCards = async (subIds: string[]) => {
-    log(`Fetching cards for: ${subIds.join(', ')}`);
     setLoading(true);
     try {
       const allPromises = subIds.map(async (id) => {
         const response = await fetch(`./json/${id}.json`);
         if (response.ok) return await response.json();
-        console.warn(`JSON load failed: ${id}`);
         return [];
       });
       const results = await Promise.all(allPromises);
-      const flattened = results.flat();
-      log(`Fetched ${flattened.length} cards.`);
-      return flattened;
+      return results.flat();
     } catch (error) {
       log(`Error: ${error instanceof Error ? error.message : "Fetch Failed"}`);
       return [];
@@ -56,170 +54,189 @@ const App: React.FC = () => {
   };
 
   const startFlashcards = async (subject: SubjectInfo) => {
-    log(`Mode: Flashcards - Subject: ${subject.name}`);
     setSelectedSubject(subject);
     setTotalShuffleMode(false);
     const allCards = await fetchSubjectCards(subject.subModuleIds);
     const shuffled = [...allCards].sort(() => Math.random() - 0.5).slice(0, 20);
     setCurrentCards(shuffled);
     setStudyMode('flashcards');
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const startListView = async (subject: SubjectInfo) => {
-    log(`Mode: List - Subject: ${subject.name}`);
     setSelectedSubject(subject);
     setTotalShuffleMode(false);
     const allCards = await fetchSubjectCards(subject.subModuleIds);
-    const shuffled = [...allCards].sort(() => Math.random() - 0.5).slice(0, 20);
-    setCurrentCards(shuffled);
+    setCurrentCards(allCards);
     setStudyMode('list');
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const startTotalShuffle = async () => {
-    log("Mode: Total Shuffle");
-    setLoading(true);
     setTotalShuffleMode(true);
-    try {
-      const allSubIds = SUBJECTS.flatMap(s => s.subModuleIds);
-      const allCards = await fetchSubjectCards(allSubIds);
-      const shuffled = [...allCards].sort(() => Math.random() - 0.5).slice(0, 20);
-      setCurrentCards(shuffled);
-      setStudyMode('flashcards');
-      window.scrollTo(0, 0);
-    } finally {
-      setLoading(false);
-    }
+    const allSubIds = SUBJECTS.flatMap(s => s.subModuleIds);
+    const allCards = await fetchSubjectCards(allSubIds);
+    const shuffled = [...allCards].sort(() => Math.random() - 0.5).slice(0, 20);
+    setCurrentCards(shuffled);
+    setStudyMode('flashcards');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleRefreshCards = async () => {
-    log("Refreshing cards...");
     if (!selectedSubject && !totalShuffleMode) return;
-    setLoading(true);
     const subIds = totalShuffleMode 
       ? SUBJECTS.flatMap(s => s.subModuleIds) 
       : selectedSubject!.subModuleIds;
     const allCards = await fetchSubjectCards(subIds);
     const shuffled = [...allCards].sort(() => Math.random() - 0.5).slice(0, 20);
     setCurrentCards(shuffled);
-    window.scrollTo(0, 0);
-    setLoading(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const startAI = (subject?: SubjectInfo) => {
-    log("Mode: AI Tutor");
     if (subject) setSelectedSubject(subject);
     setStudyMode('ai');
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleBackToSelection = () => {
-    log("Navigating to Selection");
     setStudyMode('selection');
     setSelectedSubject(null);
     setCurrentCards([]);
     setTotalShuffleMode(false);
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
-    <div className={`min-h-screen flex flex-col transition-colors duration-300 ${isDarkMode ? 'bg-gray-950 text-gray-100' : 'bg-gray-50 text-gray-900'}`}>
+    <div className={`min-h-screen flex flex-col transition-colors duration-500 ${isDarkMode ? 'bg-gray-950 text-gray-100' : 'bg-gray-50 text-gray-900'}`}>
       
-      {/* Visual Debug Info (Bottom Left) */}
-      <div className="fixed bottom-4 left-4 z-[9999] bg-black/80 text-[10px] text-green-400 p-3 rounded-lg border border-green-900 font-mono shadow-xl hidden md:block">
-        <div className="flex items-center space-x-2 mb-1 border-b border-green-900 pb-1">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-          <span className="font-bold">SYSTEM STATUS v{APP_VERSION}</span>
-        </div>
-        <div>Mode: {studyMode}</div>
-        <div>Cards: {currentCards.length}</div>
-        <div className="mt-1 opacity-60">
-          {debugLog.map((l, i) => <div key={i}>&gt; {l}</div>)}
+      {/* Mobile/Floating Status Bar */}
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end space-y-2 pointer-events-none md:pointer-events-auto">
+        <div className={`px-4 py-2 rounded-2xl border backdrop-blur-md shadow-2xl transition-all ${isDarkMode ? 'bg-gray-900/80 border-gray-800 text-blue-400' : 'bg-white/80 border-gray-200 text-blue-600'}`}>
+          <div className="flex items-center space-x-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span className="text-[10px] font-black tracking-tighter uppercase">Engine Live v{APP_VERSION}</span>
+          </div>
         </div>
       </div>
 
       <header className={`border-b sticky top-0 z-50 shadow-sm transition-colors duration-300 ${isDarkMode ? 'bg-gray-950/80 border-gray-800' : 'bg-white/80 border-gray-100'} backdrop-blur-md`}>
         <div className="max-w-6xl mx-auto px-4 h-14 md:h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-2 cursor-pointer" onClick={handleBackToSelection}>
-            <div className="bg-blue-600 text-white p-1 rounded-lg shadow-sm">
+          <div className="flex items-center space-x-2 cursor-pointer group" onClick={handleBackToSelection}>
+            <div className="bg-blue-600 text-white p-1.5 rounded-xl shadow-lg shadow-blue-500/30 group-hover:scale-110 transition-transform">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
-            <h1 className="text-lg md:text-xl font-black tracking-tighter">GAS ENGINE</h1>
+            <h1 className="text-xl md:text-2xl font-black tracking-tighter italic">GAS MASTER</h1>
           </div>
 
-          <button 
-            onClick={() => setIsDarkMode(!isDarkMode)}
-            className={`p-2 rounded-full border transition-all ${isDarkMode ? 'bg-gray-900 border-gray-800 text-yellow-400' : 'bg-gray-100 border-gray-200 text-gray-600'}`}
-          >
-            {isDarkMode ? '☀️' : '🌙'}
-          </button>
+          <div className="flex items-center space-x-2">
+            <button 
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className={`p-2.5 rounded-xl border transition-all active:scale-90 ${isDarkMode ? 'bg-gray-900 border-gray-800 text-yellow-400' : 'bg-white border-gray-200 text-gray-600 shadow-sm'}`}
+            >
+              {isDarkMode ? '☀️' : '🌙'}
+            </button>
+          </div>
         </div>
       </header>
 
       <main className={`flex-1 max-w-6xl mx-auto w-full px-4 ${studyMode === 'selection' ? 'py-8' : 'py-4'}`}>
         {loading && (
-          <div className="fixed inset-0 bg-white/50 dark:bg-gray-950/50 backdrop-blur-sm z-[100] flex items-center justify-center">
-             <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-2xl flex flex-col items-center space-y-4">
-                <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-sm font-black text-gray-700 dark:text-gray-300 tracking-tight">DATA LOADING...</p>
+          <div className="fixed inset-0 bg-gray-950/20 backdrop-blur-[2px] z-[100] flex items-center justify-center animate-in fade-in duration-300">
+             <div className="bg-white dark:bg-gray-900 p-8 rounded-[2rem] shadow-2xl flex flex-col items-center space-y-4 border border-gray-200 dark:border-gray-800">
+                <div className="w-12 h-12 border-[5px] border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                <div className="text-center">
+                  <p className="text-sm font-black text-gray-900 dark:text-white tracking-tight uppercase">Data Loading</p>
+                  <p className="text-[10px] text-gray-500 font-bold mt-1">최적의 학습 환경을 구성 중입니다...</p>
+                </div>
              </div>
           </div>
         )}
 
         {studyMode === 'selection' && (
           <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="text-center max-w-3xl mx-auto space-y-4 px-2">
-              <div className={`inline-block px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase ${isDarkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
-                Focused Learning Engine
+            {/* Dashboard Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className={`md:col-span-2 rounded-[2.5rem] p-8 md:p-12 flex flex-col justify-center space-y-6 transition-all ${isDarkMode ? 'bg-gradient-to-br from-blue-900/40 to-gray-900 border-blue-900/30' : 'bg-gradient-to-br from-blue-50 to-white border-blue-100'} border shadow-xl relative overflow-hidden`}>
+                <div className="absolute -right-20 -bottom-20 w-64 h-64 bg-blue-600/5 rounded-full blur-3xl"></div>
+                <div className="relative space-y-4">
+                  <div className={`inline-block px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase ${isDarkMode ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-600 text-white'}`}>
+                    Welcome Back, Master
+                  </div>
+                  <h2 className="text-4xl md:text-6xl font-black leading-tight tracking-tighter">
+                    가스기사 시험 <br/>
+                    <span className="text-blue-600">완벽 대비 엔진</span>
+                  </h2>
+                  <p className={`text-sm md:text-lg leading-relaxed max-w-lg ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    총 {totalQuestions}개의 핵심 기출 변형 문항이 준비되어 있습니다. <br/>
+                    과목별 집중 모드 또는 전 범위 무작위 셔플로 실전 감각을 익히세요.
+                  </p>
+                  
+                  <div className="pt-4 flex flex-col sm:flex-row gap-4">
+                    <button 
+                      onClick={startTotalShuffle}
+                      className="px-10 py-5 bg-blue-600 text-white rounded-[1.5rem] font-black text-lg shadow-2xl shadow-blue-500/40 hover:scale-105 active:scale-95 transition-all flex items-center justify-center space-x-3"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      <span>무작위 20문제 시작</span>
+                    </button>
+                    <button 
+                      onClick={() => startAI()}
+                      className={`px-10 py-5 rounded-[1.5rem] font-black text-lg border-2 transition-all flex items-center justify-center space-x-3 hover:bg-gray-100 dark:hover:bg-gray-800 ${isDarkMode ? 'border-gray-800 text-gray-300' : 'border-gray-100 text-gray-600 bg-white'}`}
+                    >
+                      <span>AI 튜터에게 질문하기</span>
+                    </button>
+                  </div>
+                </div>
               </div>
-              <h2 className="text-3xl md:text-5xl font-black leading-tight tracking-tighter">가스기사 마스터 v2.5</h2>
-              <p className="text-sm md:text-lg text-gray-500 leading-relaxed">
-                과목별 20문항 집중 학습 모드<br/>
-                학습 종료 시 무작위 셔플을 통해 반복 숙달하세요.
-              </p>
-              
-              <div className="pt-4">
-                <button 
-                  onClick={startTotalShuffle}
-                  className={`w-full md:w-auto px-8 py-4 rounded-2xl font-black transition-all flex items-center justify-center space-x-3 group active:scale-95 ${isDarkMode ? 'bg-white text-gray-950' : 'bg-gray-900 text-white'} shadow-xl`}
-                >
-                  <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  <span>전 범위 통합 20문제 학습</span>
-                </button>
+
+              <div className="grid grid-cols-2 md:grid-cols-1 gap-6">
+                 <div className={`rounded-3xl p-6 border flex flex-col justify-center items-center text-center space-y-2 ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}`}>
+                    <div className="text-3xl font-black text-blue-600">{totalQuestions}</div>
+                    <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Total Cards</div>
+                 </div>
+                 <div className={`rounded-3xl p-6 border flex flex-col justify-center items-center text-center space-y-2 ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}`}>
+                    <div className="text-3xl font-black text-blue-600">4</div>
+                    <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Subjects</div>
+                 </div>
+                 <div className={`hidden md:flex rounded-3xl p-6 border flex-col justify-center items-center text-center space-y-2 ${isDarkMode ? 'bg-blue-600 text-white border-transparent' : 'bg-gray-900 text-white border-transparent'}`}>
+                    <div className="text-xl font-black italic">Gemini 3.0</div>
+                    <div className="text-[10px] font-black opacity-60 uppercase tracking-widest">Tutor Engine</div>
+                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Subject Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pb-20">
               {SUBJECTS.map((sub) => (
-                <div key={sub.id} className={`rounded-3xl p-6 shadow-sm border transition-all group flex flex-col ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 hover:shadow-xl'}`}>
-                  <div className="text-4xl mb-4 group-hover:scale-110 transition-transform">{sub.icon}</div>
+                <div key={sub.id} className={`rounded-[2rem] p-6 shadow-sm border transition-all group flex flex-col ${isDarkMode ? 'bg-gray-900 border-gray-800 hover:border-blue-900/50' : 'bg-white border-gray-100 hover:shadow-xl hover:border-blue-100'}`}>
+                  <div className="w-14 h-14 bg-gray-50 dark:bg-gray-800 rounded-2xl flex items-center justify-center text-3xl mb-4 group-hover:scale-110 transition-transform duration-500">{sub.icon}</div>
                   <h3 className="text-xl font-black mb-2">{sub.name}</h3>
-                  <p className="text-xs text-gray-500 mb-8 flex-1 leading-relaxed">{sub.description}</p>
+                  <p className={`text-xs mb-8 flex-1 leading-relaxed ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>{sub.description}</p>
                   
                   <div className="space-y-2 mt-auto">
                     <button 
                       onClick={() => startFlashcards(sub)}
-                      className="w-full py-4 bg-blue-600 text-white text-sm font-black rounded-2xl active:scale-95 transition-transform flex items-center justify-center space-x-2"
+                      className="w-full py-4 bg-blue-600 text-white text-sm font-black rounded-2xl active:scale-95 hover:bg-blue-700 transition-all flex items-center justify-center space-x-2"
                     >
-                      <span>집중 20문항 카드</span>
+                      <span>집중 20문항 시작</span>
                     </button>
                     <div className="grid grid-cols-2 gap-2">
                       <button 
                         onClick={() => startListView(sub)}
-                        className={`py-2.5 border font-bold rounded-xl text-[10px] ${isDarkMode ? 'border-gray-800 bg-gray-950' : 'border-gray-200 bg-gray-50'}`}
+                        className={`py-2.5 border font-black rounded-xl text-[10px] transition-all hover:bg-gray-50 dark:hover:bg-gray-800 ${isDarkMode ? 'border-gray-800 bg-gray-950 text-gray-400' : 'border-gray-200 bg-gray-50 text-gray-500'}`}
                       >
-                        문항 리스트
+                        전체 리스트
                       </button>
                       <button 
                         onClick={() => startAI(sub)}
-                        className={`py-2.5 border font-bold rounded-xl text-[10px] ${isDarkMode ? 'border-gray-800 bg-gray-950' : 'border-gray-200 bg-gray-50'}`}
+                        className={`py-2.5 border font-black rounded-xl text-[10px] transition-all hover:bg-gray-50 dark:hover:bg-gray-800 ${isDarkMode ? 'border-gray-800 bg-gray-950 text-gray-400' : 'border-gray-200 bg-gray-50 text-gray-500'}`}
                       >
-                        AI 상담
+                        AI 질의응답
                       </button>
                     </div>
                   </div>
@@ -232,18 +249,20 @@ const App: React.FC = () => {
         {studyMode === 'flashcards' && (
           <div className="animate-in fade-in slide-in-from-right-4 duration-500 max-w-2xl mx-auto">
              <div className="flex items-center justify-between mb-6 px-1">
-                <button onClick={handleBackToSelection} className="p-2 rounded-full border dark:border-gray-800">
+                <button onClick={handleBackToSelection} className={`p-2.5 rounded-xl border transition-all ${isDarkMode ? 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white' : 'bg-white border-gray-200 text-gray-600 shadow-sm'}`}>
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                   </svg>
                 </button>
-                <div className="text-center">
-                   <h2 className="text-sm font-black truncate max-w-[150px]">
-                      {totalShuffleMode ? '전 범위 통합' : selectedSubject?.name}
+                <div className="text-center px-4">
+                   <h2 className={`text-xs font-black truncate max-w-[180px] uppercase tracking-widest ${isDarkMode ? 'text-gray-300' : 'text-gray-900'}`}>
+                      {totalShuffleMode ? '전 범위 통합 챌린지' : selectedSubject?.name}
                    </h2>
                 </div>
-                <button onClick={handleRefreshCards} className="p-2 rounded-full border dark:border-gray-800 text-blue-500">
-                   🔄
+                <button onClick={handleRefreshCards} className={`p-2.5 rounded-xl border transition-all ${isDarkMode ? 'bg-gray-900 border-gray-800 text-blue-400' : 'bg-white border-gray-200 text-blue-600 shadow-sm'}`}>
+                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                   </svg>
                 </button>
              </div>
              <FlashcardView 
@@ -263,6 +282,7 @@ const App: React.FC = () => {
               onBack={handleBackToSelection} 
               isDarkMode={isDarkMode}
               onShuffle={handleRefreshCards}
+              totalCount={selectedSubject?.h4Count}
             />
           </div>
         )}
@@ -274,8 +294,9 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <footer className={`border-t py-10 text-center text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? 'bg-gray-950 border-gray-900 text-gray-700' : 'bg-white border-gray-100 text-gray-400'}`}>
-          Gas Engineer Master Engine v{APP_VERSION}
+      <footer className={`border-t py-12 text-center transition-colors duration-300 ${isDarkMode ? 'bg-gray-950 border-gray-900 text-gray-700' : 'bg-white border-gray-100 text-gray-400'}`}>
+          <p className="text-[10px] font-black uppercase tracking-widest">Gas Engineer Master Engine v{APP_VERSION}</p>
+          <p className="text-[9px] mt-2 opacity-50 font-bold">© 2025 Study Logic AI Integration. All Rights Reserved.</p>
       </footer>
     </div>
   );
