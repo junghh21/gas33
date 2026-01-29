@@ -36,8 +36,3 @@ export const generateExplanation = async (topic: string, question?: string) => {
     return `AI 튜터와 연결하는 중 오류가 발생했습니다: ${error instanceof Error ? error.message : String(error)}`;
   }
 };
-
-export const startAIChat = (systemInstruction: string) => {
-  console.warn("Direct SDK Chat is deprecated for security. Use API endpoints.");
-  return null;
-};

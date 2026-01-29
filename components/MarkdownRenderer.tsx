@@ -1,7 +1,7 @@
 
-import React, { useEffect, useRef } from 'react';
-import { marked } from 'marked';
-import renderMathInElement from 'katex-autorender';
+import React, { useEffect, useRef } from 'https://esm.sh/react@19.0.0';
+import { marked } from 'https://esm.sh/marked@11.1.1';
+import renderMathInElement from 'https://esm.sh/katex@0.16.9/dist/contrib/auto-render.mjs';
 
 interface Props {
   content: string;
@@ -28,7 +28,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content, className = "" }) => {
         if (isMounted && rootRef.current) {
           rootRef.current.innerHTML = rawHtml;
           
-          // KaTeX rendering
+          // KaTeX rendering for math formulas
           renderMathInElement(rootRef.current, {
             delimiters: [
               { left: "$$", right: "$$", display: true },

@@ -1,6 +1,6 @@
 
-import React from 'react';
-import ReactDOM from 'react-dom/client';
+import React from 'https://esm.sh/react@19.0.0';
+import ReactDOM from 'https://esm.sh/react-dom@19.0.0/client';
 import App from './App';
 
 const rootElement = document.getElementById('root');
@@ -9,7 +9,7 @@ const statusEl = document.getElementById('status-update');
 console.log("[GAS ENGINE] Initializing React Application...");
 
 if (statusEl) {
-  statusEl.innerText = "React 구성 요소를 마운트하는 중...";
+  statusEl.innerText = "Mounting UI Components...";
 }
 
 if (rootElement) {
@@ -24,7 +24,7 @@ if (rootElement) {
   } catch (err) {
     console.error("[GAS ENGINE] Initialization failed:", err);
     if (statusEl) {
-      statusEl.innerText = "런타임 오류 발생: " + (err instanceof Error ? err.message : String(err));
+      statusEl.innerText = "Runtime Error: " + (err instanceof Error ? err.message : String(err));
     }
   }
 } else {

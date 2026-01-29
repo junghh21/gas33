@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'https://esm.sh/react@19.0.0';
 import { Flashcard } from './types';
 import { SUBJECTS, APP_VERSION, SubjectInfo } from './constants';
 import FlashcardView from './components/FlashcardView';
@@ -12,7 +12,6 @@ const App: React.FC = () => {
   const [currentCards, setCurrentCards] = useState<Flashcard[]>([]);
   const [loading, setLoading] = useState(false);
   const [totalShuffleMode, setTotalShuffleMode] = useState(false);
-  const [debugLog, setDebugLog] = useState<string[]>([]);
   
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('gas-engine-theme');
@@ -20,11 +19,6 @@ const App: React.FC = () => {
   });
 
   const totalQuestions = SUBJECTS.reduce((acc, curr) => acc + curr.h4Count, 0);
-
-  const log = (msg: string) => {
-    console.log(`[App] ${msg}`);
-    setDebugLog(prev => [msg, ...prev].slice(0, 5));
-  };
 
   useEffect(() => {
     localStorage.setItem('gas-engine-theme', isDarkMode ? 'dark' : 'light');
@@ -46,7 +40,7 @@ const App: React.FC = () => {
       const results = await Promise.all(allPromises);
       return results.flat();
     } catch (error) {
-      log(`Error: ${error instanceof Error ? error.message : "Fetch Failed"}`);
+      console.error("Fetch Failed", error);
       return [];
     } finally {
       setLoading(false);
