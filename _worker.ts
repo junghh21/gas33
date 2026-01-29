@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from "@google/genai";
 
 interface Env {
@@ -10,89 +9,44 @@ export default {
   async fetch(request: Request, env: Env) {
     const url = new URL(request.url);
 
-    // 1. JSON Data API Endpoint (Fallback for direct fetch & Diagnostic)
+    // 1. JSON Data API Endpoint (Fallback & Diagnostic)
     if (url.pathname.startsWith("/api/json/")) {
       try {
         const id = url.pathname.split("/").pop();
         if (!id) throw new Error("Missing ID in URL");
         
-        // Re-construct the internal asset path relative to the current host
-        const newUrl = new URL(request.url);
-        newUrl.pathname = `/json/${id}.json`;
+        // Vite의 public 폴더에 저장된 파일은 루트 경로에서 바로 접근 가능합니다.
+        const internalPath = `/json/${id}.json`;
+        const internalUrl = new URL(internalPath, url.origin);
         
-        console.log(`[Worker] Proxying request to: ${newUrl.pathname}`);
+        console.log(`[Worker Proxy] Fetching: ${internalPath}`);
         
-        // ASSETS.fetch is sensitive to the request object.
-        // We create a fresh request to ensure no stale headers interfere.
-        const internalRequest = new Request(newUrl.toString(), {
+        const internalRequest = new Request(internalUrl.toString(), {
           method: 'GET',
           headers: { 
             'Accept': 'application/json',
-            'X-Worker-Proxy': 'true'
+            'X-Worker-Origin': 'true'
           }
         });
         
         const assetResponse = await env.ASSETS.fetch(internalRequest);
         
         if (!assetResponse.ok) {
-          console.warn(`[Worker] Internal Asset fetch failed: ${assetResponse.status} for ${id}`);
+          console.error(`[Worker Proxy] 404 Not Found: ${internalPath}`);
           return new Response(JSON.stringify({ 
-            error: `Data module '${id}' not found in internal build assets.`,
-            status: assetResponse.status,
-            path: newUrl.pathname
+            error: `Module '${id}' not found. Ensure file exists at 'public${internalPath}'`,
+            status: assetResponse.status 
           }), { 
             status: 404, 
             headers: { "Content-Type": "application/json" } 
           });
         }
 
-        // Return the asset as is, but force the content-type to JSON just in case.
-        const finalResponse = new Response(assetResponse.body, assetResponse);
-        finalResponse.headers.set("Content-Type", "application/json; charset=utf-8");
-        return finalResponse;
-
-      } catch (error: any) {
-        console.error(`[Worker] Proxy Engine Fatal Error:`, error);
-        return new Response(JSON.stringify({ 
-          error: error.message || "Internal Proxy Engine Error",
-          stack: error.stack
-        }), { 
-          status: 500,
-          headers: { "Content-Type": "application/json" } 
-        });
-      }
-    }
-
-    // 2. AI Generation API Endpoint (Gemini 3.0 Integration)
-    if (url.pathname === "/api/generate" && request.method === "POST") {
-      try {
-        const { topic, question, systemInstruction } = await request.json();
+        const response = new Response(assetResponse.body, assetResponse);
+        response.headers.set("Content-Type", "application/json; charset=utf-8");
+        return response;
         
-        if (!env.API_KEY) {
-          return new Response(JSON.stringify({ error: "Missing server-side API_KEY." }), { 
-            status: 500,
-            headers: { "Content-Type": "application/json" }
-          });
-        }
-
-        const ai = new GoogleGenAI({ apiKey: env.API_KEY });
-        const response = await ai.models.generateContent({
-          model: 'gemini-3-flash-preview',
-          contents: question 
-            ? `'${topic}' 분야에 대해 다음 질문을 가스기사 전문가로서 상세히 설명해줘: ${question}`
-            : `'${topic}' 과목에 대한 핵심 요약 및 암기 비법을 알려줘.`,
-          config: {
-            systemInstruction,
-            temperature: 0.7,
-            topP: 0.9,
-          }
-        });
-
-        return new Response(JSON.stringify({ text: response.text }), {
-          headers: { "Content-Type": "application/json" }
-        });
       } catch (error: any) {
-        console.error("[Worker] AI Tutoring Failed:", error);
         return new Response(JSON.stringify({ error: error.message }), { 
           status: 500,
           headers: { "Content-Type": "application/json" } 
@@ -100,7 +54,29 @@ export default {
       }
     }
 
-    // Default: Serve static assets via Cloudflare Pages internal mechanism
+    // 2. AI Generation API Endpoint
+    if (url.pathname === "/api/generate" && request.method === "POST") {
+      try {
+        const { topic, question, systemInstruction } = await request.json();
+        const ai = new GoogleGenAI({ apiKey: env.API_KEY });
+        const response = await ai.models.generateContent({
+          model: 'gemini-3-flash-preview',
+          contents: question 
+            ? `'${topic}'에 대한 질문: ${question}`
+            : `'${topic}' 과목 핵심 요약`,
+          config: { systemInstruction, temperature: 0.7 }
+        });
+        return new Response(JSON.stringify({ text: response.text }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      } catch (error: any) {
+        return new Response(JSON.stringify({ error: error.message }), { 
+          status: 500,
+          headers: { "Content-Type": "application/json" } 
+        });
+      }
+    }
+
     return env.ASSETS.fetch(request);
   }
 };

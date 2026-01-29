@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'https://esm.sh/react@19.0.0';
 import { marked } from 'https://esm.sh/marked@11.1.1';
 import renderMathInElement from 'https://esm.sh/katex@0.16.9/dist/contrib/auto-render.mjs';
@@ -17,40 +16,52 @@ const MarkdownRenderer: React.FC<Props> = ({ content, className = "" }) => {
     const renderContent = async () => {
       if (!rootRef.current) return;
 
+      // Custom renderer to wrap tables for mobile responsiveness
+      const renderer = new marked.Renderer();
+      const originalTable = renderer.table.bind(renderer);
+      renderer.table = (header: string, body: string) => {
+        const tableHtml = originalTable(header, body);
+        return `<div class="table-wrapper my-6 overflow-x-auto shadow-sm border border-gray-100 dark:border-gray-800 rounded-xl bg-white dark:bg-gray-900/50">
+          ${tableHtml}
+        </div>`;
+      };
+
       marked.setOptions({
         breaks: true,
-        gfm: true
+        gfm: true,
+        renderer
       });
 
       try {
-        // 1. 마크다운을 HTML로 변환합니다.
         const rawHtml = await marked.parse(content);
         
         if (isMounted && rootRef.current) {
-          // KaTeX 실행 전에 먼저 HTML을 주입하여 "빈 요소"가 보이는 시간을 최소화하고,
-          // 이후 KaTeX 단계에서 오류가 나더라도 최소한의 텍스트는 보이게 합니다.
+          // 1. Inject HTML Content
           rootRef.current.innerHTML = rawHtml;
           
-          try {
-            // 2. KaTeX를 사용하여 수학 수식을 렌더링합니다.
-            renderMathInElement(rootRef.current, {
-              delimiters: [
-                { left: "$$", right: "$$", display: true },
-                { left: "$", right: "$", display: false },
-                { left: "\\(", right: "\\)", display: false },
-                { left: "\\[", right: "\\]", display: true }
-              ],
-              throwOnError: false
-            });
-          } catch (mathError) {
-            // KaTeX 렌더링 중 오류가 발생하더라도 이미 HTML은 주입된 상태이므로
-            // 사용자는 마운트된 HTML 내용을 볼 수 있습니다. (Graceful Degradation)
-            console.warn("KaTeX rendering error (Degrading to raw text for formulas):", mathError);
-          }
+          // 2. Render Math in element
+          // We use a small timeout to ensure DOM layout is ready and document mode is checked
+          setTimeout(() => {
+            if (isMounted && rootRef.current) {
+              try {
+                renderMathInElement(rootRef.current, {
+                  delimiters: [
+                    { left: "$$", right: "$$", display: true },
+                    { left: "$", right: "$", display: false },
+                    { left: "\\(", right: "\\)", display: false },
+                    { left: "\\[", right: "\\]", display: true }
+                  ],
+                  ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"],
+                  throwOnError: false
+                });
+              } catch (mathErr) {
+                console.warn("KaTeX non-fatal error during auto-render:", mathErr);
+              }
+            }
+          }, 10);
         }
       } catch (e) {
-        console.error("Markdown rendering error:", e);
-        // 마크다운 파싱 자체가 실패한 경우에만 원본 텍스트를 직접 노출합니다.
+        console.error("Markdown parsing error:", e);
         if (isMounted && rootRef.current) {
           rootRef.current.innerText = content;
         }
