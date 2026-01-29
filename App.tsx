@@ -1,10 +1,19 @@
 
-import React, { useState, useEffect } from 'https://esm.sh/react@19.0.0';
+import React, { useState, useEffect, useRef } from 'https://esm.sh/react@19.0.0';
 import { Flashcard } from './types';
 import { SUBJECTS, APP_VERSION, SubjectInfo } from './constants';
 import FlashcardView from './components/FlashcardView';
 import AIChat from './components/AIChat';
 import CardListView from './components/CardListView';
+
+const shuffleArray = <T,>(array: T[]): T[] => {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+};
 
 const App: React.FC = () => {
   const [selectedSubject, setSelectedSubject] = useState<SubjectInfo | null>(null);
@@ -12,7 +21,10 @@ const App: React.FC = () => {
   const [currentCards, setCurrentCards] = useState<Flashcard[]>([]);
   const [loading, setLoading] = useState(false);
   const [totalShuffleMode, setTotalShuffleMode] = useState(false);
+  const [isEngineReady, setIsEngineReady] = useState(false);
   
+  const cardCache = useRef<Record<string, Flashcard[]>>({});
+
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('gas-engine-theme');
     return saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -29,19 +41,51 @@ const App: React.FC = () => {
     }
   }, [isDarkMode]);
 
+  useEffect(() => {
+    const checkCacheStatus = () => {
+      const allSubIds = SUBJECTS.flatMap(s => s.subModuleIds);
+      const cachedCount = allSubIds.filter(id => cardCache.current[id] && cardCache.current[id].length > 0).length;
+      if (cachedCount > 0 && cachedCount >= allSubIds.length * 0.7) { 
+        setIsEngineReady(true);
+      }
+    };
+    checkCacheStatus();
+  }, [loading]);
+
   const fetchSubjectCards = async (subIds: string[]) => {
+    const missingIds = subIds.filter(id => !cardCache.current[id]);
+    
+    if (missingIds.length === 0) {
+      return subIds.flatMap(id => cardCache.current[id] || []);
+    }
+
     setLoading(true);
     try {
-      const allPromises = subIds.map(async (id) => {
-        // Updated to use the worker API endpoint
-        const response = await fetch(`/api/json/${id}`);
-        if (response.ok) return await response.json();
-        return [];
+      const allPromises = missingIds.map(async (id) => {
+        try {
+          // DIRECT LOAD: /api/json/ 대신 /json/*.json 경로로 직접 요청
+          const response = await fetch(`/json/${id}.json`);
+          if (response.ok) {
+            const data = await response.json();
+            const cards = Array.isArray(data) ? data : [];
+            cardCache.current[id] = cards;
+            return cards;
+          }
+          console.warn(`[App] Module ${id} fetch failed (Status: ${response.status})`);
+          cardCache.current[id] = [];
+          return [];
+        } catch (e) {
+          console.error(`[App] Network error for ${id}:`, e);
+          cardCache.current[id] = [];
+          return [];
+        }
       });
-      const results = await Promise.all(allPromises);
-      return results.flat();
+      
+      await Promise.all(allPromises);
+      const combined = subIds.flatMap(id => cardCache.current[id] || []);
+      return combined;
     } catch (error) {
-      console.error("Fetch Failed", error);
+      console.error("[App] Aggregated fetch failed:", error);
       return [];
     } finally {
       setLoading(false);
@@ -49,42 +93,71 @@ const App: React.FC = () => {
   };
 
   const startFlashcards = async (subject: SubjectInfo) => {
+    if (loading) return;
+    const allCards = await fetchSubjectCards(subject.subModuleIds);
+    if (allCards.length === 0) {
+      alert("데이터 로드에 실패했습니다. 파일 경로를 확인해주세요.");
+      return;
+    }
     setSelectedSubject(subject);
     setTotalShuffleMode(false);
-    const allCards = await fetchSubjectCards(subject.subModuleIds);
-    const shuffled = [...allCards].sort(() => Math.random() - 0.5).slice(0, 20);
+    const shuffled = shuffleArray(allCards).slice(0, 20);
     setCurrentCards(shuffled);
     setStudyMode('flashcards');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const startListView = async (subject: SubjectInfo) => {
+    if (loading) return;
+    const allCards = await fetchSubjectCards(subject.subModuleIds);
+    if (allCards.length === 0) {
+      alert("데이터 로드에 실패했습니다.");
+      return;
+    }
     setSelectedSubject(subject);
     setTotalShuffleMode(false);
-    const allCards = await fetchSubjectCards(subject.subModuleIds);
     setCurrentCards(allCards);
     setStudyMode('list');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const startTotalShuffle = async () => {
-    setTotalShuffleMode(true);
+    if (loading) return;
+    setLoading(true);
+    
     const allSubIds = SUBJECTS.flatMap(s => s.subModuleIds);
     const allCards = await fetchSubjectCards(allSubIds);
-    const shuffled = [...allCards].sort(() => Math.random() - 0.5).slice(0, 20);
+    
+    if (allCards.length === 0) {
+      setLoading(false);
+      alert("전체 학습 데이터를 불러오지 못했습니다. 서버 구성을 확인해주세요.");
+      return;
+    }
+
+    setTotalShuffleMode(true);
+    setSelectedSubject(null);
+    const shuffled = shuffleArray(allCards).slice(0, 20);
     setCurrentCards(shuffled);
     setStudyMode('flashcards');
+    setLoading(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleRefreshCards = async () => {
-    if (!selectedSubject && !totalShuffleMode) return;
+    if (loading) return;
+    setLoading(true);
+    await new Promise(r => setTimeout(r, 600)); 
+    
     const subIds = totalShuffleMode 
       ? SUBJECTS.flatMap(s => s.subModuleIds) 
-      : selectedSubject!.subModuleIds;
+      : (selectedSubject ? selectedSubject.subModuleIds : []);
+      
     const allCards = await fetchSubjectCards(subIds);
-    const shuffled = [...allCards].sort(() => Math.random() - 0.5).slice(0, 20);
-    setCurrentCards(shuffled);
+    if (allCards.length > 0) {
+      const shuffled = shuffleArray(allCards).slice(0, 20);
+      setCurrentCards(shuffled);
+    }
+    setLoading(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -105,12 +178,11 @@ const App: React.FC = () => {
   return (
     <div className={`min-h-screen flex flex-col transition-colors duration-500 ${isDarkMode ? 'bg-gray-950 text-gray-100' : 'bg-gray-50 text-gray-900'}`}>
       
-      {/* Mobile/Floating Status Bar */}
       <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end space-y-2 pointer-events-none md:pointer-events-auto">
         <div className={`px-4 py-2 rounded-2xl border backdrop-blur-md shadow-2xl transition-all ${isDarkMode ? 'bg-gray-900/80 border-gray-800 text-blue-400' : 'bg-white/80 border-gray-200 text-blue-600'}`}>
           <div className="flex items-center space-x-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-[10px] font-black tracking-tighter uppercase">Engine Live v{APP_VERSION}</span>
+            <div className={`w-2.5 h-2.5 rounded-full ${isEngineReady ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.6)]' : 'bg-yellow-500 animate-pulse'}`}></div>
+            <span className="text-[10px] font-black tracking-tighter uppercase">Engine {isEngineReady ? 'READY' : 'SYNCING'} v{APP_VERSION}</span>
           </div>
         </div>
       </div>
@@ -126,25 +198,23 @@ const App: React.FC = () => {
             <h1 className="text-xl md:text-2xl font-black tracking-tighter italic">GAS MASTER</h1>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <button 
-              onClick={() => setIsDarkMode(!isDarkMode)}
-              className={`p-2.5 rounded-xl border transition-all active:scale-90 ${isDarkMode ? 'bg-gray-900 border-gray-800 text-yellow-400' : 'bg-white border-gray-200 text-gray-600 shadow-sm'}`}
-            >
-              {isDarkMode ? '☀️' : '🌙'}
-            </button>
-          </div>
+          <button 
+            onClick={() => setIsDarkMode(!isDarkMode)}
+            className={`p-2.5 rounded-xl border transition-all active:scale-90 ${isDarkMode ? 'bg-gray-900 border-gray-800 text-yellow-400' : 'bg-white border-gray-200 text-gray-600 shadow-sm'}`}
+          >
+            {isDarkMode ? '☀️' : '🌙'}
+          </button>
         </div>
       </header>
 
       <main className={`flex-1 max-w-6xl mx-auto w-full px-4 ${studyMode === 'selection' ? 'py-8' : 'py-4'}`}>
         {loading && (
-          <div className="fixed inset-0 bg-gray-950/20 backdrop-blur-[2px] z-[100] flex items-center justify-center animate-in fade-in duration-300">
+          <div className="fixed inset-0 bg-gray-950/40 backdrop-blur-[4px] z-[100] flex items-center justify-center animate-in fade-in duration-300">
              <div className="bg-white dark:bg-gray-900 p-8 rounded-[2rem] shadow-2xl flex flex-col items-center space-y-4 border border-gray-200 dark:border-gray-800">
                 <div className="w-12 h-12 border-[5px] border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                 <div className="text-center">
-                  <p className="text-sm font-black text-gray-900 dark:text-white tracking-tight uppercase">Data Loading</p>
-                  <p className="text-[10px] text-gray-500 font-bold mt-1">최적의 학습 환경을 구성 중입니다...</p>
+                  <p className="text-sm font-black text-gray-900 dark:text-white tracking-tight uppercase">Processing Engine</p>
+                  <p className="text-[10px] text-gray-500 font-bold mt-1">핵심 문항 데이터를 직접 로드 중입니다...</p>
                 </div>
              </div>
           </div>
@@ -152,7 +222,6 @@ const App: React.FC = () => {
 
         {studyMode === 'selection' && (
           <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            {/* Dashboard Overview */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className={`md:col-span-2 rounded-[2.5rem] p-8 md:p-12 flex flex-col justify-center space-y-6 transition-all ${isDarkMode ? 'bg-gradient-to-br from-blue-900/40 to-gray-900 border-blue-900/30' : 'bg-gradient-to-br from-blue-50 to-white border-blue-100'} border shadow-xl relative overflow-hidden`}>
                 <div className="absolute -right-20 -bottom-20 w-64 h-64 bg-blue-600/5 rounded-full blur-3xl"></div>
@@ -172,9 +241,10 @@ const App: React.FC = () => {
                   <div className="pt-4 flex flex-col sm:flex-row gap-4">
                     <button 
                       onClick={startTotalShuffle}
-                      className="px-10 py-5 bg-blue-600 text-white rounded-[1.5rem] font-black text-lg shadow-2xl shadow-blue-500/40 hover:scale-105 active:scale-95 transition-all flex items-center justify-center space-x-3"
+                      disabled={loading}
+                      className="group px-10 py-5 bg-blue-600 text-white rounded-[1.5rem] font-black text-lg shadow-2xl shadow-blue-500/40 hover:scale-105 active:scale-95 transition-all flex items-center justify-center space-x-3 ring-4 ring-blue-600/10 disabled:opacity-50"
                     >
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-6 h-6 group-active:animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
                       <span>무작위 20문제 시작</span>
@@ -190,11 +260,11 @@ const App: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-1 gap-6">
-                 <div className={`rounded-3xl p-6 border flex flex-col justify-center items-center text-center space-y-2 ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}`}>
-                    <div className="text-3xl font-black text-blue-600">{totalQuestions}</div>
+                 <div className={`rounded-3xl p-6 border flex flex-col justify-center items-center text-center space-y-2 transition-transform hover:scale-105 ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}`}>
+                    <div className={`text-3xl font-black text-blue-600 ${isEngineReady ? 'animate-pulse' : ''}`}>{totalQuestions}</div>
                     <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Total Cards</div>
                  </div>
-                 <div className={`rounded-3xl p-6 border flex flex-col justify-center items-center text-center space-y-2 ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}`}>
+                 <div className={`rounded-3xl p-6 border flex flex-col justify-center items-center text-center space-y-2 transition-transform hover:scale-105 ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}`}>
                     <div className="text-3xl font-black text-blue-600">4</div>
                     <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Subjects</div>
                  </div>
@@ -205,7 +275,6 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* Subject Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pb-20">
               {SUBJECTS.map((sub) => (
                 <div key={sub.id} className={`rounded-[2rem] p-6 shadow-sm border transition-all group flex flex-col ${isDarkMode ? 'bg-gray-900 border-gray-800 hover:border-blue-900/50' : 'bg-white border-gray-100 hover:shadow-xl hover:border-blue-100'}`}>
@@ -216,7 +285,8 @@ const App: React.FC = () => {
                   <div className="space-y-2 mt-auto">
                     <button 
                       onClick={() => startFlashcards(sub)}
-                      className="w-full py-4 bg-blue-600 text-white text-sm font-black rounded-2xl active:scale-95 hover:bg-blue-700 transition-all flex items-center justify-center space-x-2"
+                      disabled={loading}
+                      className="w-full py-4 bg-blue-600 text-white text-sm font-black rounded-2xl active:scale-95 hover:bg-blue-700 transition-all flex items-center justify-center space-x-2 shadow-lg shadow-blue-500/10 disabled:opacity-50"
                     >
                       <span>집중 20문항 시작</span>
                     </button>
@@ -254,8 +324,8 @@ const App: React.FC = () => {
                       {totalShuffleMode ? '전 범위 통합 챌린지' : selectedSubject?.name}
                    </h2>
                 </div>
-                <button onClick={handleRefreshCards} className={`p-2.5 rounded-xl border transition-all ${isDarkMode ? 'bg-gray-900 border-gray-800 text-blue-400' : 'bg-white border-gray-200 text-blue-600 shadow-sm'}`}>
-                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button onClick={handleRefreshCards} disabled={loading} className={`p-2.5 rounded-xl border transition-all ${isDarkMode ? 'bg-gray-900 border-gray-800 text-blue-400' : 'bg-white border-gray-200 text-blue-600 shadow-sm'} disabled:opacity-50`}>
+                   <svg className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                    </svg>
                 </button>
