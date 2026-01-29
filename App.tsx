@@ -22,6 +22,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [totalShuffleMode, setTotalShuffleMode] = useState(false);
   const [isEngineReady, setIsEngineReady] = useState(false);
+  const [diagnosticStatus, setDiagnosticStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   
   const cardCache = useRef<Record<string, Flashcard[]>>({});
 
@@ -41,7 +42,6 @@ const App: React.FC = () => {
     }
   }, [isDarkMode]);
 
-  // Check engine readiness based on cache
   useEffect(() => {
     const checkCacheStatus = () => {
       const allSubIds = SUBJECTS.flatMap(s => s.subModuleIds);
@@ -52,6 +52,39 @@ const App: React.FC = () => {
     };
     checkCacheStatus();
   }, [loading]);
+
+  const testApiEndpoint = async () => {
+    if (diagnosticStatus === 'testing') return;
+    setDiagnosticStatus('testing');
+    
+    try {
+      const start = performance.now();
+      const response = await fetch(`/api/json/gas_general`);
+      const end = performance.now();
+      
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorBody.substring(0, 100)}`);
+      }
+
+      const data = await response.json();
+      if (!Array.isArray(data)) {
+        throw new Error("Response is not a valid JSON array");
+      }
+      
+      if (data.length === 0) {
+        throw new Error("Response array is empty");
+      }
+
+      console.log(`[Diagnostic] API Endpoint OK (${Math.round(end - start)}ms) Data Size: ${data.length}`);
+      setDiagnosticStatus('success');
+      setTimeout(() => setDiagnosticStatus('idle'), 3000);
+    } catch (e) {
+      console.error("[Diagnostic] API Endpoint Failed:", e);
+      setDiagnosticStatus('error');
+      setTimeout(() => setDiagnosticStatus('idle'), 3000);
+    }
+  };
 
   const fetchSubjectCards = async (subIds: string[]) => {
     const missingIds = subIds.filter(id => !cardCache.current[id]);
@@ -69,7 +102,7 @@ const App: React.FC = () => {
           
           // Try 2: Fallback to Worker API if direct fails
           if (!response.ok) {
-            console.warn(`[App] Direct fetch failed for ${id}, trying API fallback...`);
+            console.warn(`[App] Direct fetch failed for ${id} (Status: ${response.status}), trying API fallback...`);
             response = await fetch(`/api/json/${id}`);
           }
 
@@ -80,6 +113,7 @@ const App: React.FC = () => {
             return cards;
           }
           
+          console.error(`[App] Both fetch methods failed for ${id}`);
           cardCache.current[id] = [];
           return [];
         } catch (e) {
@@ -187,12 +221,29 @@ const App: React.FC = () => {
     <div className={`min-h-screen flex flex-col transition-colors duration-500 ${isDarkMode ? 'bg-gray-950 text-gray-100' : 'bg-gray-50 text-gray-900'}`}>
       
       <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end space-y-2 pointer-events-none md:pointer-events-auto">
-        <div className={`px-4 py-2 rounded-2xl border backdrop-blur-md shadow-2xl transition-all ${isDarkMode ? 'bg-gray-900/80 border-gray-800 text-blue-400' : 'bg-white/80 border-gray-200 text-blue-600'}`}>
-          <div className="flex items-center space-x-2">
-            <div className={`w-2.5 h-2.5 rounded-full ${isEngineReady ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.6)]' : 'bg-yellow-500 animate-pulse'}`}></div>
-            <span className="text-[10px] font-black tracking-tighter uppercase">Engine {isEngineReady ? 'READY' : 'SYNCING'} v{APP_VERSION}</span>
-          </div>
-        </div>
+        <button 
+          onClick={testApiEndpoint}
+          className={`px-4 py-2 rounded-2xl border backdrop-blur-md shadow-2xl transition-all active:scale-95 flex items-center space-x-2 ${
+            isDarkMode ? 'bg-gray-900/80 border-gray-800' : 'bg-white/80 border-gray-200 shadow-sm'
+          }`}
+        >
+          <div className={`w-2.5 h-2.5 rounded-full transition-colors duration-300 ${
+            diagnosticStatus === 'testing' ? 'bg-purple-500 animate-spin' :
+            diagnosticStatus === 'success' ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.6)]' :
+            diagnosticStatus === 'error' ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.6)]' :
+            isEngineReady ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'
+          }`}></div>
+          <span className={`text-[10px] font-black tracking-tighter uppercase ${
+            diagnosticStatus === 'success' ? 'text-green-500' :
+            diagnosticStatus === 'error' ? 'text-red-500' :
+            isDarkMode ? 'text-blue-400' : 'text-blue-600'
+          }`}>
+            {diagnosticStatus === 'testing' ? 'Testing API...' :
+             diagnosticStatus === 'success' ? 'API OK' :
+             diagnosticStatus === 'error' ? 'API FAIL' :
+             isEngineReady ? 'Engine READY' : 'SYNCING'} v{APP_VERSION}
+          </span>
+        </button>
       </div>
 
       <header className={`border-b sticky top-0 z-50 shadow-sm transition-colors duration-300 ${isDarkMode ? 'bg-gray-950/80 border-gray-800' : 'bg-white/80 border-gray-100'} backdrop-blur-md`}>
@@ -222,7 +273,7 @@ const App: React.FC = () => {
                 <div className="w-12 h-12 border-[5px] border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                 <div className="text-center">
                   <p className="text-sm font-black text-gray-900 dark:text-white tracking-tight uppercase">Processing Engine</p>
-                  <p className="text-[10px] text-gray-500 font-bold mt-1">이중 로딩 시스템을 통해 최적의 데이터를 구성 중입니다...</p>
+                  <p className="text-[10px] text-gray-500 font-bold mt-1">데이터 무결성을 검증하고 20문제를 선별 중입니다...</p>
                 </div>
              </div>
           </div>
