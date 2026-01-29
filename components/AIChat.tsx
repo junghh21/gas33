@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'https://esm.sh/react@19.0.0';
 import { ChatMessage } from '../types';
 import { generateExplanation } from '../services/geminiService';
 import MarkdownRenderer from './MarkdownRenderer';

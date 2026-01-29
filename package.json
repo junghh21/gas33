@@ -1,5 +1,5 @@
 {
-  "name": "가스기사-학습-엔진-v2.5",
+  "name": "https://gas33.pages.dev",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -14,7 +14,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
+    
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }
