@@ -50,7 +50,6 @@ const App: React.FC = () => {
     setSelectedSubject(subject);
     setTotalShuffleMode(false);
     const allCards = await fetchSubjectCards(subject.subModuleIds);
-    // Shuffle and pick 20
     const shuffled = [...allCards].sort(() => Math.random() - 0.5).slice(0, 20);
     setCurrentCards(shuffled);
     setStudyMode('flashcards');
@@ -60,8 +59,10 @@ const App: React.FC = () => {
   const startListView = async (subject: SubjectInfo) => {
     setSelectedSubject(subject);
     setTotalShuffleMode(false);
-    const cards = await fetchSubjectCards(subject.subModuleIds);
-    setCurrentCards(cards);
+    const allCards = await fetchSubjectCards(subject.subModuleIds);
+    // Apply 20 items limit to list view too as requested
+    const shuffled = [...allCards].sort(() => Math.random() - 0.5).slice(0, 20);
+    setCurrentCards(shuffled);
     setStudyMode('list');
     window.scrollTo(0, 0);
   };
@@ -145,7 +146,7 @@ const App: React.FC = () => {
           <div className="fixed inset-0 bg-white/50 dark:bg-gray-950/50 backdrop-blur-sm z-[100] flex items-center justify-center">
              <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-2xl flex flex-col items-center space-y-4">
                 <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-sm font-black text-gray-700 dark:text-gray-300">데이터를 갱신하는 중...</p>
+                <p className="text-sm font-black text-gray-700 dark:text-gray-300">데이터를 처리하는 중...</p>
              </div>
           </div>
         )}
@@ -154,11 +155,11 @@ const App: React.FC = () => {
           <div className="space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div className="text-center max-w-3xl mx-auto space-y-4 md:space-y-6 px-2">
               <div className={`inline-block px-3 py-1 rounded-full text-[10px] md:text-xs font-black tracking-widest uppercase ${isDarkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
-                Efficient Learning
+                Focused Learning
               </div>
-              <h2 className={`text-3xl md:text-5xl font-black leading-tight tracking-tighter ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>스마트 집중 학습</h2>
+              <h2 className={`text-3xl md:text-5xl font-black leading-tight tracking-tighter ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>가스기사 마스터</h2>
               <p className={`text-sm md:text-lg leading-relaxed ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                수백 개의 문항 중 핵심 20개를 엄선하여 보여줍니다.<br className="hidden md:block"/> 반복 학습과 셔플 기능으로 완벽히 암기하세요.
+                과목별 20문항 집중 학습을 지원합니다.<br className="hidden md:block"/> 효율적인 암기와 실전 감각을 동시에 잡으세요.
               </p>
               
               <div className="pt-2">
@@ -169,7 +170,7 @@ const App: React.FC = () => {
                   <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  <span>통합 무작위 20문항 시작</span>
+                  <span>전 범위 통합 20문제 학습</span>
                 </button>
               </div>
             </div>
@@ -193,14 +194,14 @@ const App: React.FC = () => {
                       onClick={() => startFlashcards(sub)}
                       className="w-full py-4 bg-blue-600 text-white text-sm font-black rounded-2xl active:scale-95 transition-transform flex items-center justify-center space-x-2 shadow-lg shadow-blue-500/20"
                     >
-                      <span>집중 20문항 학습</span>
+                      <span>집중 20문항 카드</span>
                     </button>
                     <div className="grid grid-cols-2 gap-2">
                       <button 
                         onClick={() => startListView(sub)}
                         className={`py-2.5 border font-bold rounded-xl text-[10px] active:scale-95 ${isDarkMode ? 'border-gray-800 text-gray-500 bg-gray-950' : 'border-gray-200 text-gray-600 bg-gray-50'}`}
                       >
-                        전체 목록
+                        문항 리스트
                       </button>
                       <button 
                         onClick={() => startAI(sub)}
@@ -250,7 +251,14 @@ const App: React.FC = () => {
 
         {studyMode === 'list' && selectedSubject && (
           <div className="animate-in fade-in duration-500">
-            <CardListView cards={currentCards} moduleName={selectedSubject.name} onBack={handleBackToSelection} />
+            <CardListView 
+              cards={currentCards} 
+              moduleName={selectedSubject.name} 
+              onBack={handleBackToSelection} 
+              isDarkMode={isDarkMode}
+              onShuffle={handleRefreshCards}
+              totalCount={selectedSubject.h4Count}
+            />
           </div>
         )}
 
@@ -264,7 +272,7 @@ const App: React.FC = () => {
       <footer className={`border-t py-8 transition-colors duration-300 ${isDarkMode ? 'bg-gray-950 border-gray-900 text-gray-600' : 'bg-white border-gray-100 text-gray-400'}`}>
         <div className="max-w-6xl mx-auto px-6 text-center">
           <p className="text-[10px] font-bold uppercase tracking-widest mb-2">Gas Engineer Engine v{APP_VERSION}</p>
-          <p className="text-[9px]">본 시스템은 20문항 집중 학습을 권장합니다.</p>
+          <p className="text-[9px]">본 시스템은 20문항 단위의 효율적 학습을 권장합니다.</p>
         </div>
       </footer>
     </div>
