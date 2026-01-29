@@ -16,43 +16,43 @@ export default {
         const id = url.pathname.split("/").pop();
         if (!id) throw new Error("Missing ID in URL");
         
-        // Re-construct the internal asset path relative to origin
-        const assetPath = `/json/${id}.json`;
-        const assetUrl = new URL(assetPath, url.origin);
+        // Re-construct the internal asset path relative to the current host
+        const newUrl = new URL(request.url);
+        newUrl.pathname = `/json/${id}.json`;
         
-        console.log(`[Worker] Proxying request to internal asset: ${assetPath}`);
+        console.log(`[Worker] Proxying request to: ${newUrl.pathname}`);
         
-        // Use the original request as base to preserve environment-specific behaviors
-        const internalRequest = new Request(assetUrl.toString(), {
+        // ASSETS.fetch is sensitive to the request object.
+        // We create a fresh request to ensure no stale headers interfere.
+        const internalRequest = new Request(newUrl.toString(), {
           method: 'GET',
           headers: { 
             'Accept': 'application/json',
-            'X-Internal-Proxy': 'true'
+            'X-Worker-Proxy': 'true'
           }
         });
         
         const assetResponse = await env.ASSETS.fetch(internalRequest);
         
         if (!assetResponse.ok) {
-          console.warn(`[Worker] Internal Asset Not Found: ${assetResponse.status} for ${id}`);
+          console.warn(`[Worker] Internal Asset fetch failed: ${assetResponse.status} for ${id}`);
           return new Response(JSON.stringify({ 
-            error: `Data module '${id}' not found in assets collection.`,
-            path: assetPath,
-            status: assetResponse.status 
+            error: `Data module '${id}' not found in internal build assets.`,
+            status: assetResponse.status,
+            path: newUrl.pathname
           }), { 
             status: 404, 
             headers: { "Content-Type": "application/json" } 
           });
         }
 
-        // Return the actual file content
-        // We clone the response to modify headers if needed, ensuring it's recognized as JSON
-        const response = new Response(assetResponse.body, assetResponse);
-        response.headers.set("Content-Type", "application/json; charset=utf-8");
-        return response;
-        
+        // Return the asset as is, but force the content-type to JSON just in case.
+        const finalResponse = new Response(assetResponse.body, assetResponse);
+        finalResponse.headers.set("Content-Type", "application/json; charset=utf-8");
+        return finalResponse;
+
       } catch (error: any) {
-        console.error(`[Worker] Fatal Proxy Error:`, error);
+        console.error(`[Worker] Proxy Engine Fatal Error:`, error);
         return new Response(JSON.stringify({ 
           error: error.message || "Internal Proxy Engine Error",
           stack: error.stack
@@ -69,7 +69,7 @@ export default {
         const { topic, question, systemInstruction } = await request.json();
         
         if (!env.API_KEY) {
-          return new Response(JSON.stringify({ error: "Missing API_KEY environment variable." }), { 
+          return new Response(JSON.stringify({ error: "Missing server-side API_KEY." }), { 
             status: 500,
             headers: { "Content-Type": "application/json" }
           });
@@ -79,12 +79,12 @@ export default {
         const response = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
           contents: question 
-            ? `'${topic}' 분야에 대해 다음 질문을 가스기사 전문가로서 설명해줘: ${question}`
-            : `'${topic}' 과목에 대한 핵심 요약 및 학습 팁을 알려줘.`,
+            ? `'${topic}' 분야에 대해 다음 질문을 가스기사 전문가로서 상세히 설명해줘: ${question}`
+            : `'${topic}' 과목에 대한 핵심 요약 및 암기 비법을 알려줘.`,
           config: {
             systemInstruction,
-            temperature: 0.75,
-            topP: 0.95,
+            temperature: 0.7,
+            topP: 0.9,
           }
         });
 
@@ -92,7 +92,7 @@ export default {
           headers: { "Content-Type": "application/json" }
         });
       } catch (error: any) {
-        console.error("[Worker] AI Generation Failed:", error);
+        console.error("[Worker] AI Tutoring Failed:", error);
         return new Response(JSON.stringify({ error: error.message }), { 
           status: 500,
           headers: { "Content-Type": "application/json" } 
@@ -100,7 +100,7 @@ export default {
       }
     }
 
-    // Default: Normal Static Asset Serving
+    // Default: Serve static assets via Cloudflare Pages internal mechanism
     return env.ASSETS.fetch(request);
   }
 };

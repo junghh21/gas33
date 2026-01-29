@@ -59,24 +59,25 @@ const App: React.FC = () => {
     
     try {
       const start = performance.now();
-      const response = await fetch(`/api/json/gas_general`);
+      // 진단을 위해 명시적으로 API 엔드포인트 호출
+      const response = await fetch(`/api/json/gas_general`, { cache: 'no-store' });
       const end = performance.now();
       
       if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorBody.substring(0, 100)}`);
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText.substring(0, 50)}`);
       }
 
       const data = await response.json();
       if (!Array.isArray(data)) {
-        throw new Error("Response is not a valid JSON array");
+        throw new Error("Data is not a JSON array");
       }
       
       if (data.length === 0) {
-        throw new Error("Response array is empty");
+        throw new Error("Data array is empty");
       }
 
-      console.log(`[Diagnostic] API Endpoint OK (${Math.round(end - start)}ms) Data Size: ${data.length}`);
+      console.log(`[Diagnostic] API Endpoint Success (${Math.round(end - start)}ms). Items: ${data.length}`);
       setDiagnosticStatus('success');
       setTimeout(() => setDiagnosticStatus('idle'), 3000);
     } catch (e) {
@@ -97,12 +98,12 @@ const App: React.FC = () => {
     try {
       const allPromises = missingIds.map(async (id) => {
         try {
-          // Try 1: Direct static fetch
+          // 1차 시도: 정적 파일 직접 로드
           let response = await fetch(`/json/${id}.json`);
           
-          // Try 2: Fallback to Worker API if direct fails
+          // 2차 시도: 실패 시 Worker API Proxy 로드
           if (!response.ok) {
-            console.warn(`[App] Direct fetch failed for ${id} (Status: ${response.status}), trying API fallback...`);
+            console.warn(`[App] Direct fetch failed for ${id}, trying API fallback...`);
             response = await fetch(`/api/json/${id}`);
           }
 
@@ -113,7 +114,7 @@ const App: React.FC = () => {
             return cards;
           }
           
-          console.error(`[App] Both fetch methods failed for ${id}`);
+          console.error(`[App] Failed to load module ${id} (Status: ${response.status})`);
           cardCache.current[id] = [];
           return [];
         } catch (e) {
@@ -138,7 +139,7 @@ const App: React.FC = () => {
     if (loading) return;
     const allCards = await fetchSubjectCards(subject.subModuleIds);
     if (allCards.length === 0) {
-      alert("데이터를 로드할 수 없습니다. 연결 상태를 확인해주세요.");
+      alert("데이터를 로드할 수 없습니다. 엔진 진단 버튼(우측 하단)을 눌러 상태를 확인해 보세요.");
       return;
     }
     setSelectedSubject(subject);
@@ -172,7 +173,7 @@ const App: React.FC = () => {
     
     if (allCards.length === 0) {
       setLoading(false);
-      alert("전체 학습 데이터를 불러오지 못했습니다. 엔진 상태를 확인해주세요.");
+      alert("전체 학습 데이터를 불러오지 못했습니다. 우측 하단 엔진 상태를 확인해 주세요.");
       return;
     }
 
@@ -220,7 +221,8 @@ const App: React.FC = () => {
   return (
     <div className={`min-h-screen flex flex-col transition-colors duration-500 ${isDarkMode ? 'bg-gray-950 text-gray-100' : 'bg-gray-50 text-gray-900'}`}>
       
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end space-y-2 pointer-events-none md:pointer-events-auto">
+      {/* Dynamic Engine Status Badge */}
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end space-y-2">
         <button 
           onClick={testApiEndpoint}
           className={`px-4 py-2 rounded-2xl border backdrop-blur-md shadow-2xl transition-all active:scale-95 flex items-center space-x-2 ${
@@ -228,7 +230,7 @@ const App: React.FC = () => {
           }`}
         >
           <div className={`w-2.5 h-2.5 rounded-full transition-colors duration-300 ${
-            diagnosticStatus === 'testing' ? 'bg-purple-500 animate-spin' :
+            diagnosticStatus === 'testing' ? 'bg-purple-500 animate-pulse' :
             diagnosticStatus === 'success' ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.6)]' :
             diagnosticStatus === 'error' ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.6)]' :
             isEngineReady ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'
@@ -273,7 +275,7 @@ const App: React.FC = () => {
                 <div className="w-12 h-12 border-[5px] border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                 <div className="text-center">
                   <p className="text-sm font-black text-gray-900 dark:text-white tracking-tight uppercase">Processing Engine</p>
-                  <p className="text-[10px] text-gray-500 font-bold mt-1">데이터 무결성을 검증하고 20문제를 선별 중입니다...</p>
+                  <p className="text-[10px] text-gray-500 font-bold mt-1">데이터 무결성을 검증하고 학습 모듈을 구성 중입니다...</p>
                 </div>
              </div>
           </div>
@@ -281,6 +283,7 @@ const App: React.FC = () => {
 
         {studyMode === 'selection' && (
           <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {/* Main Hero Section */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className={`md:col-span-2 rounded-[2.5rem] p-8 md:p-12 flex flex-col justify-center space-y-6 transition-all ${isDarkMode ? 'bg-gradient-to-br from-blue-900/40 to-gray-900 border-blue-900/30' : 'bg-gradient-to-br from-blue-50 to-white border-blue-100'} border shadow-xl relative overflow-hidden`}>
                 <div className="absolute -right-20 -bottom-20 w-64 h-64 bg-blue-600/5 rounded-full blur-3xl"></div>
@@ -318,6 +321,7 @@ const App: React.FC = () => {
                 </div>
               </div>
 
+              {/* Stats Grid */}
               <div className="grid grid-cols-2 md:grid-cols-1 gap-6">
                  <div className={`rounded-3xl p-6 border flex flex-col justify-center items-center text-center space-y-2 transition-transform hover:scale-105 ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100 shadow-sm'}`}>
                     <div className={`text-3xl font-black text-blue-600 ${isEngineReady ? 'animate-pulse' : ''}`}>{totalQuestions}</div>
@@ -334,6 +338,7 @@ const App: React.FC = () => {
               </div>
             </div>
 
+            {/* Subject List */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pb-20">
               {SUBJECTS.map((sub) => (
                 <div key={sub.id} className={`rounded-[2rem] p-6 shadow-sm border transition-all group flex flex-col ${isDarkMode ? 'bg-gray-900 border-gray-800 hover:border-blue-900/50' : 'bg-white border-gray-100 hover:shadow-xl hover:border-blue-100'}`}>
