@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { marked } from 'marked';
-import renderMathInElement from 'katex-auto-render';
+import renderMathInElement from 'https://esm.sh/katex@0.16.9/dist/contrib/auto-render.mjs';
 
 interface Props {
   content: string;

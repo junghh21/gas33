@@ -15,15 +15,16 @@ export default {
       try {
         const { topic, question, systemInstruction } = await request.json();
         
-        // Strict adherence to using process.env.API_KEY for the SDK initialization
-        // Note: In Cloudflare Workers, process.env is often mapped from env via build-time or config, 
-        // but the system prompt specifies this as the exclusive source.
+        // Use the API key exclusively from process.env.API_KEY as per the strict prompt requirement
         const apiKey = process.env.API_KEY;
         
         if (!apiKey) {
-          return new Response(JSON.stringify({ error: "API_KEY configuration missing." }), { 
+          return new Response(JSON.stringify({ error: "API_KEY configuration missing in process.env." }), { 
             status: 500,
-            headers: { "Content-Type": "application/json" }
+            headers: { 
+              "Content-Type": "application/json",
+              "Access-Control-Allow-Origin": "*"
+            }
           });
         }
 
@@ -40,12 +41,18 @@ export default {
         });
 
         return new Response(JSON.stringify({ text: response.text }), {
-          headers: { "Content-Type": "application/json" }
+          headers: { 
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*"
+          }
         });
       } catch (error: any) {
         return new Response(JSON.stringify({ error: error.message || "Internal Server Error" }), { 
           status: 500,
-          headers: { "Content-Type": "application/json" }
+          headers: { 
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*"
+          }
         });
       }
     }
