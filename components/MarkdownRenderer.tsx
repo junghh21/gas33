@@ -13,7 +13,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content, className = "" }) => {
 
   useEffect(() => {
     if (rootRef.current) {
-      // 1. marked 기본 설정 (동기 방식 유지)
+      // 1. marked 기본 설정
       marked.setOptions({
         breaks: true,
         gfm: true
@@ -36,7 +36,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content, className = "" }) => {
         }
       } catch (e) {
         console.error("Markdown rendering error:", e);
-        rootRef.current.innerText = content;
+        if (rootRef.current) rootRef.current.innerText = content;
       }
     }
   }, [content]);
