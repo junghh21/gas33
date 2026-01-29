@@ -1,60 +1,81 @@
 
 import React, { useState, useEffect } from 'react';
-import { ModuleInfo, Flashcard } from './types';
-import { MODULES, APP_VERSION } from './constants';
+import { Flashcard } from './types';
+import { SUBJECTS, APP_VERSION, SubjectInfo } from './constants';
 import FlashcardView from './components/FlashcardView';
 import AIChat from './components/AIChat';
 import CardListView from './components/CardListView';
 
 const App: React.FC = () => {
-  const [selectedModule, setSelectedModule] = useState<ModuleInfo | null>(null);
+  const [selectedSubject, setSelectedSubject] = useState<SubjectInfo | null>(null);
   const [studyMode, setStudyMode] = useState<'selection' | 'flashcards' | 'ai' | 'list'>('selection');
   const [currentCards, setCurrentCards] = useState<Flashcard[]>([]);
   const [loading, setLoading] = useState(false);
   const [totalShuffleMode, setTotalShuffleMode] = useState(false);
+  
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem('gas-engine-theme');
+    return saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  });
 
-  const fetchFlashcards = async (moduleId: string) => {
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('gas-engine-theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('gas-engine-theme', 'light');
+    }
+  }, [isDarkMode]);
+
+  const fetchSubjectCards = async (subIds: string[]) => {
     setLoading(true);
     try {
-      const response = await fetch(`./json/${moduleId}.json`);
-      if (response.ok) {
-        const data = await response.json();
-        return data;
-      }
-      return [];
+      const allPromises = subIds.map(async (id) => {
+        const response = await fetch(`./json/${id}.json`);
+        if (response.ok) return await response.json();
+        return [];
+      });
+      const results = await Promise.all(allPromises);
+      return results.flat();
     } catch (error) {
-      console.error("Error fetching flashcards:", error);
+      console.error("Error fetching subject cards:", error);
       return [];
     } finally {
       setLoading(false);
     }
   };
 
-  const startFlashcards = async (module: ModuleInfo) => {
-    setSelectedModule(module);
+  const startFlashcards = async (subject: SubjectInfo) => {
+    setSelectedSubject(subject);
     setTotalShuffleMode(false);
-    const cards = await fetchFlashcards(module.id);
-    setCurrentCards(cards);
+    const allCards = await fetchSubjectCards(subject.subModuleIds);
+    // Shuffle and pick 20
+    const shuffled = [...allCards].sort(() => Math.random() - 0.5).slice(0, 20);
+    setCurrentCards(shuffled);
     setStudyMode('flashcards');
+    window.scrollTo(0, 0);
   };
 
-  const startListView = async (module: ModuleInfo) => {
-    setSelectedModule(module);
+  const startListView = async (subject: SubjectInfo) => {
+    setSelectedSubject(subject);
     setTotalShuffleMode(false);
-    const cards = await fetchFlashcards(module.id);
+    const cards = await fetchSubjectCards(subject.subModuleIds);
     setCurrentCards(cards);
     setStudyMode('list');
+    window.scrollTo(0, 0);
   };
 
   const startTotalShuffle = async () => {
     setLoading(true);
     setTotalShuffleMode(true);
     try {
-      const allCardsPromises = MODULES.map(m => fetchFlashcards(m.id));
-      const results = await Promise.all(allCardsPromises);
-      const combinedCards = results.flat();
-      setCurrentCards(combinedCards);
+      const allSubIds = SUBJECTS.flatMap(s => s.subModuleIds);
+      const allCards = await fetchSubjectCards(allSubIds);
+      const shuffled = [...allCards].sort(() => Math.random() - 0.5).slice(0, 20);
+      setCurrentCards(shuffled);
       setStudyMode('flashcards');
+      window.scrollTo(0, 0);
     } catch (error) {
       console.error("Error in total shuffle:", error);
     } finally {
@@ -62,122 +83,130 @@ const App: React.FC = () => {
     }
   };
 
-  const startAI = (module?: ModuleInfo) => {
-    if (module) setSelectedModule(module);
+  const handleRefreshCards = async () => {
+    if (!selectedSubject && !totalShuffleMode) return;
+    
+    setLoading(true);
+    const subIds = totalShuffleMode 
+      ? SUBJECTS.flatMap(s => s.subModuleIds) 
+      : selectedSubject!.subModuleIds;
+      
+    const allCards = await fetchSubjectCards(subIds);
+    const shuffled = [...allCards].sort(() => Math.random() - 0.5).slice(0, 20);
+    setCurrentCards(shuffled);
+    window.scrollTo(0, 0);
+    setLoading(false);
+  };
+
+  const startAI = (subject?: SubjectInfo) => {
+    if (subject) setSelectedSubject(subject);
     setStudyMode('ai');
+    window.scrollTo(0, 0);
   };
 
   const handleBackToSelection = () => {
     setStudyMode('selection');
-    setSelectedModule(null);
+    setSelectedSubject(null);
     setCurrentCards([]);
     setTotalShuffleMode(false);
+    window.scrollTo(0, 0);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Navigation Header */}
-      <header className="bg-white border-b sticky top-0 z-50 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div 
-            className="flex items-center space-x-2 cursor-pointer"
-            onClick={handleBackToSelection}
-          >
-            <div className="bg-blue-600 text-white p-1.5 rounded-lg shadow-inner">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+    <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-gray-950 text-gray-100' : 'bg-gray-50 text-gray-900'} flex flex-col`}>
+      <header className={`border-b sticky top-0 z-50 shadow-sm transition-colors duration-300 ${isDarkMode ? 'bg-gray-950/80 border-gray-800' : 'bg-white/80 border-gray-100'} backdrop-blur-md`}>
+        <div className="max-w-6xl mx-auto px-4 h-14 md:h-16 flex items-center justify-between">
+          <div className="flex items-center space-x-2 cursor-pointer" onClick={handleBackToSelection}>
+            <div className="bg-blue-600 text-white p-1 rounded-lg shadow-sm">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
-            <div>
-              <h1 className="text-xl font-black text-gray-900 leading-none tracking-tighter">GAS ENGINE</h1>
-              <span className="text-[10px] font-bold text-blue-600 tracking-widest uppercase">Version {APP_VERSION}</span>
-            </div>
+            <h1 className={`text-lg md:text-xl font-black tracking-tighter ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>GAS ENGINE</h1>
           </div>
 
-          <div className="hidden md:flex items-center space-x-6 text-sm font-bold text-gray-500 tracking-tighter">
+          <div className="flex items-center space-x-2 md:space-x-4">
             <button 
-              onClick={() => startAI()}
-              className={`hover:text-blue-600 transition-colors flex items-center space-x-1 ${studyMode === 'ai' ? 'text-blue-600' : ''}`}
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className={`p-2 rounded-full border transition-all ${isDarkMode ? 'bg-gray-900 border-gray-800 text-yellow-400' : 'bg-gray-100 border-gray-200 text-gray-600'}`}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-              </svg>
-              <span>AI Tutor</span>
+              {isDarkMode ? (
+                <svg className="w-4 h-4 md:w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" /></svg>
+              ) : (
+                <svg className="w-4 h-4 md:w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" /></svg>
+              )}
             </button>
-            <span className="text-gray-300">|</span>
-            <div className="text-blue-600 font-black">총 {MODULES.reduce((acc, m) => acc + m.h4Count, 0)}문항</div>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-8">
-        
+      <main className={`flex-1 max-w-6xl mx-auto w-full px-4 ${studyMode === 'selection' ? 'py-8 md:py-12' : 'py-4 md:py-8'}`}>
+        {loading && (
+          <div className="fixed inset-0 bg-white/50 dark:bg-gray-950/50 backdrop-blur-sm z-[100] flex items-center justify-center">
+             <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-2xl flex flex-col items-center space-y-4">
+                <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-sm font-black text-gray-700 dark:text-gray-300">데이터를 갱신하는 중...</p>
+             </div>
+          </div>
+        )}
+
         {studyMode === 'selection' && (
-          <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="text-center max-w-3xl mx-auto space-y-6">
-              <div className="inline-block px-4 py-1.5 bg-blue-50 text-blue-600 rounded-full text-xs font-black tracking-widest uppercase mb-2">
-                Gas Engineer Certification Exam Helper
+          <div className="space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="text-center max-w-3xl mx-auto space-y-4 md:space-y-6 px-2">
+              <div className={`inline-block px-3 py-1 rounded-full text-[10px] md:text-xs font-black tracking-widest uppercase ${isDarkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
+                Efficient Learning
               </div>
-              <h2 className="text-5xl font-black text-gray-900 leading-tight tracking-tighter">가스기사 학습 엔진 v2.5</h2>
-              <p className="text-gray-500 text-lg leading-relaxed">
-                마크다운 데이터에서 추출된 <span className="text-blue-600 font-bold underline decoration-blue-200 underline-offset-4">{MODULES.reduce((acc, m) => acc + m.h4Count, 0)}개</span>의 핵심 문항으로 자격증을 완벽히 정복하세요.
+              <h2 className={`text-3xl md:text-5xl font-black leading-tight tracking-tighter ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>스마트 집중 학습</h2>
+              <p className={`text-sm md:text-lg leading-relaxed ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                수백 개의 문항 중 핵심 20개를 엄선하여 보여줍니다.<br className="hidden md:block"/> 반복 학습과 셔플 기능으로 완벽히 암기하세요.
               </p>
               
-              <div className="pt-4 flex flex-col md:flex-row justify-center gap-4">
+              <div className="pt-2">
                 <button 
                   onClick={startTotalShuffle}
-                  disabled={loading}
-                  className="px-8 py-4 bg-gray-900 text-white rounded-2xl font-black hover:bg-black transition-all shadow-xl shadow-gray-200 flex items-center justify-center space-x-3 group active:scale-95 disabled:opacity-50"
+                  className={`w-full md:w-auto px-8 py-4 rounded-2xl font-black transition-all flex items-center justify-center space-x-3 group active:scale-95 ${isDarkMode ? 'bg-white text-gray-950' : 'bg-gray-900 text-white'} shadow-xl`}
                 >
-                  <svg className="w-6 h-6 text-blue-400 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  <span>전 범위 무작위 통합 학습</span>
+                  <span>통합 무작위 20문항 시작</span>
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {MODULES.map((mod) => (
-                <div key={mod.id} className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-2xl hover:border-blue-100 transition-all group relative flex flex-col">
-                  <div className="absolute top-4 right-4 bg-blue-50 text-blue-600 text-[10px] font-black px-2 py-1 rounded-full border border-blue-100">
-                    {mod.h4Count} 핵심
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+              {SUBJECTS.map((sub) => (
+                <div key={sub.id} className={`rounded-3xl p-6 shadow-sm border transition-all group flex flex-col ${isDarkMode ? 'bg-gray-900 border-gray-800 hover:border-blue-500' : 'bg-white border-gray-100 hover:shadow-xl'}`}>
+                  <div className="flex items-start justify-between mb-6">
+                    <div className="text-4xl filter drop-shadow-sm group-hover:scale-110 transition-transform">{sub.icon}</div>
+                    <div className={`text-[10px] font-black px-2.5 py-1 rounded-full border ${isDarkMode ? 'bg-blue-900/30 text-blue-400 border-blue-900' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                      {sub.h4Count} Q
+                    </div>
                   </div>
-                  <div className="text-4xl mb-4 transform group-hover:scale-110 group-hover:-rotate-12 transition-all duration-500 inline-block drop-shadow-sm">{mod.icon}</div>
-                  <h3 className="text-xl font-black mb-2 group-hover:text-blue-600 transition-colors tracking-tight">{mod.name}</h3>
-                  <p className="text-gray-400 text-xs mb-6 leading-relaxed flex-1 font-medium">
-                    {mod.description}
+                  <h3 className={`text-xl font-black mb-2 group-hover:text-blue-600 transition-colors ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{sub.name}</h3>
+                  <p className={`text-xs mb-8 flex-1 leading-relaxed ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                    {sub.description}
                   </p>
                   
-                  <div className="space-y-2">
+                  <div className="space-y-3 mt-auto">
                     <button 
-                      onClick={() => startFlashcards(mod)}
-                      className="w-full py-3 bg-blue-600 text-white font-black rounded-xl hover:bg-blue-700 transition-all flex items-center justify-center space-x-2 shadow-lg shadow-blue-100 active:scale-95"
+                      onClick={() => startFlashcards(sub)}
+                      className="w-full py-4 bg-blue-600 text-white text-sm font-black rounded-2xl active:scale-95 transition-transform flex items-center justify-center space-x-2 shadow-lg shadow-blue-500/20"
                     >
-                      <span>플래시카드</span>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                      </svg>
+                      <span>집중 20문항 학습</span>
                     </button>
-                    <div className="flex space-x-2">
+                    <div className="grid grid-cols-2 gap-2">
                       <button 
-                        onClick={() => startListView(mod)}
-                        className="flex-1 py-2.5 border border-gray-200 text-gray-600 font-bold rounded-xl hover:bg-gray-50 transition-all text-xs active:scale-95 flex items-center justify-center space-x-1"
+                        onClick={() => startListView(sub)}
+                        className={`py-2.5 border font-bold rounded-xl text-[10px] active:scale-95 ${isDarkMode ? 'border-gray-800 text-gray-500 bg-gray-950' : 'border-gray-200 text-gray-600 bg-gray-50'}`}
                       >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                        </svg>
-                        <span>리스트 보기</span>
+                        전체 목록
                       </button>
                       <button 
-                        onClick={() => startAI(mod)}
-                        className="flex-1 py-2.5 border border-gray-200 text-gray-600 font-bold rounded-xl hover:bg-gray-50 transition-all text-xs active:scale-95 flex items-center justify-center space-x-1"
+                        onClick={() => startAI(sub)}
+                        className={`py-2.5 border font-bold rounded-xl text-[10px] active:scale-95 ${isDarkMode ? 'border-gray-800 text-gray-500 bg-gray-950' : 'border-gray-200 text-gray-600 bg-gray-50'}`}
                       >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                        <span>AI 과외</span>
+                        AI 상담
                       </button>
                     </div>
                   </div>
@@ -188,81 +217,54 @@ const App: React.FC = () => {
         )}
 
         {studyMode === 'flashcards' && currentCards.length > 0 && (
-          <div className="space-y-6 animate-in zoom-in-95 duration-500">
-             <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  <button 
-                    onClick={handleBackToSelection}
-                    className="p-2 hover:bg-white rounded-full transition-all border border-gray-100 shadow-sm"
-                  >
-                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
-                  </button>
-                  <div>
-                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">
-                      {totalShuffleMode ? '전 범위 통합 학습' : selectedModule?.name}
-                    </h2>
-                    {totalShuffleMode && <p className="text-xs text-blue-600 font-black tracking-widest uppercase">Total Shuffled Deck</p>}
-                  </div>
+          <div className="animate-in fade-in slide-in-from-right-4 duration-500 max-w-2xl mx-auto">
+             <div className="flex items-center justify-between mb-6 px-1">
+                <button onClick={handleBackToSelection} className={`p-2 rounded-full border ${isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100'}`}>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                </button>
+                <div className="text-center">
+                   <h2 className={`text-sm md:text-base font-black truncate max-w-[180px] ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {totalShuffleMode ? '전 범위 통합' : selectedSubject?.name}
+                   </h2>
                 </div>
-                {loading && <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>}
+                <button 
+                  onClick={handleRefreshCards}
+                  className={`p-2 rounded-full border ${isDarkMode ? 'bg-gray-900 border-gray-800 text-blue-400' : 'bg-white border-gray-100 text-blue-600'}`}
+                  title="새로운 20문제 섞기"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
              </div>
              <FlashcardView 
                cards={currentCards} 
-               onFinish={handleBackToSelection}
+               onFinish={handleBackToSelection} 
+               isDarkMode={isDarkMode}
+               onShuffle={handleRefreshCards}
              />
           </div>
         )}
 
-        {studyMode === 'list' && selectedModule && (
-          <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-            <CardListView 
-              cards={currentCards} 
-              moduleName={selectedModule.name} 
-              onBack={handleBackToSelection} 
-            />
+        {studyMode === 'list' && selectedSubject && (
+          <div className="animate-in fade-in duration-500">
+            <CardListView cards={currentCards} moduleName={selectedSubject.name} onBack={handleBackToSelection} />
           </div>
         )}
 
         {studyMode === 'ai' && (
-          <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500">
-             <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <button 
-                    onClick={handleBackToSelection}
-                    className="p-2 hover:bg-white rounded-full transition-all border border-gray-100 shadow-sm"
-                  >
-                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
-                  </button>
-                  <h2 className="text-2xl font-black text-gray-900 tracking-tight">가스기사 AI 튜터링</h2>
-                </div>
-             </div>
-             <AIChat moduleName={selectedModule?.name} />
+          <div className="max-w-4xl mx-auto animate-in fade-in duration-500">
+             <AIChat moduleName={selectedSubject?.name} onBack={handleBackToSelection} />
           </div>
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="bg-white border-t py-12 mt-20">
-        <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center text-gray-400 text-[11px] gap-8">
-          <div className="flex items-center space-x-4">
-             <div className="font-black text-gray-800 text-base tracking-tighter">GAS ENGINE</div>
-             <span className="h-4 w-px bg-gray-100"></span>
-             <p>© 2025 Gas Engineer Learning System v2.5</p>
-          </div>
-          <div className="flex space-x-8 font-bold uppercase tracking-widest">
-            <div className="flex flex-col items-center md:items-end">
-              <span className="text-blue-600 text-lg leading-none">{MODULES.reduce((acc, m) => acc + m.h4Count, 0)}</span>
-              <span>Total Points</span>
-            </div>
-            <div className="flex flex-col items-center md:items-end">
-              <span className="text-gray-800 text-lg leading-none">{MODULES.length}</span>
-              <span>Modules</span>
-            </div>
-          </div>
+      <footer className={`border-t py-8 transition-colors duration-300 ${isDarkMode ? 'bg-gray-950 border-gray-900 text-gray-600' : 'bg-white border-gray-100 text-gray-400'}`}>
+        <div className="max-w-6xl mx-auto px-6 text-center">
+          <p className="text-[10px] font-bold uppercase tracking-widest mb-2">Gas Engineer Engine v{APP_VERSION}</p>
+          <p className="text-[9px]">본 시스템은 20문항 집중 학습을 권장합니다.</p>
         </div>
       </footer>
     </div>

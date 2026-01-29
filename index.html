@@ -5,9 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>가스기사 학습 엔진 v2.5</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind Typography 플러그인 추가 -->
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script type="importmap">
 {
@@ -19,6 +21,30 @@
   }
 }
 </script>
+<style>
+    /* KaTeX 수식 모바일 가로 스크롤 대응 */
+    .katex-display {
+        margin: 1.5em 0;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 0.5em;
+    }
+    /* 다크 모드 수식 색상 강제 지정 */
+    .dark .katex {
+        color: #e5e7eb; /* gray-200 */
+    }
+    /* 마크다운 표(Table) 스타일 커스텀 */
+    .prose table {
+        width: 100%;
+        font-size: 0.875rem;
+    }
+    .prose thead th {
+        background-color: rgba(37, 99, 235, 0.05); /* blue-600/5 */
+    }
+    .dark .prose thead th {
+        background-color: rgba(37, 99, 235, 0.1);
+    }
+</style>
 </head>
 <body class="bg-gray-50 text-gray-900 font-sans">
     <div id="root"></div>

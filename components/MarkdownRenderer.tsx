@@ -11,64 +11,39 @@ const MarkdownRenderer: React.FC<Props> = ({ content, className = "" }) => {
 
   useEffect(() => {
     if (rootRef.current) {
-      // 1. Convert Markdown to HTML
-      const rawHtml = (window as any).marked.parse(content);
-      rootRef.current.innerHTML = rawHtml;
+      // 1. marked 옵션 설정 (줄바꿈 보존 등)
+      (window as any).marked.setOptions({
+        breaks: true,
+        gfm: true
+      });
 
-      // 2. Render LaTeX using KaTeX
-      const walkAndRender = (node: Node) => {
-        if (node.nodeType === Node.TEXT_NODE && node.textContent) {
-          const text = node.textContent;
-          const regex = /\$([^$]+)\$/g;
-          let match;
-          let lastIndex = 0;
-          const fragments: (string | HTMLElement)[] = [];
+      // 2. 마크다운 -> HTML 변환
+      try {
+        const rawHtml = (window as any).marked.parse(content);
+        rootRef.current.innerHTML = rawHtml;
 
-          while ((match = regex.exec(text)) !== null) {
-            if (match.index > lastIndex) {
-              fragments.push(text.substring(lastIndex, match.index));
-            }
-            const span = document.createElement('span');
-            try {
-              (window as any).katex.render(match[1], span, { throwOnError: false });
-              fragments.push(span);
-            } catch (e) {
-              fragments.push(match[0]);
-            }
-            lastIndex = regex.lastIndex;
-          }
-
-          if (lastIndex < text.length) {
-            fragments.push(text.substring(lastIndex));
-          }
-
-          if (fragments.length > 1 || (fragments.length === 1 && typeof fragments[0] !== 'string')) {
-            const parent = node.parentNode;
-            if (parent) {
-              fragments.forEach(frag => {
-                if (typeof frag === 'string') {
-                  parent.insertBefore(document.createTextNode(frag), node);
-                } else {
-                  parent.insertBefore(frag, node);
-                }
-              });
-              parent.removeChild(node);
-            }
-          }
-        } else if (node.nodeType === Node.ELEMENT_NODE) {
-          const children = Array.from(node.childNodes);
-          children.forEach(walkAndRender);
-        }
-      };
-
-      walkAndRender(rootRef.current);
+        // 3. KaTeX 수식 렌더링
+        (window as any).renderMathInElement(rootRef.current, {
+          delimiters: [
+            { left: "$$", right: "$$", display: true },
+            { left: "$", right: "$", display: false },
+            { left: "\\(", right: "\\)", display: false },
+            { left: "\\[", right: "\\]", display: true }
+          ],
+          throwOnError: false,
+          ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+        });
+      } catch (e) {
+        console.error("Rendering error:", e);
+        rootRef.current.innerText = content;
+      }
     }
   }, [content]);
 
   return (
     <div 
       ref={rootRef} 
-      className={`prose prose-blue max-w-none ${className}`}
+      className={`prose prose-sm md:prose-base prose-blue dark:prose-invert max-w-none transition-colors duration-300 ${className}`}
     />
   );
 };
