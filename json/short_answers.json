@@ -1,0 +1,17 @@
+
+[
+  { "id": "short-001", "question": "보일-샤를의 법칙 통합 공식", "answer": "$$\\\\frac{P_1 V_1}{T_1} = \\\\frac{P_2 V_2}{T_2}$$", "explanation": "온도, 압력, 부피의 상관관계를 한 번에 나타내는 필수 공식입니다." },
+  { "id": "short-002", "question": "그레이엄의 확산 법칙", "answer": "기체의 확산 속도는 분자량의 제곱근에 반비례함\n$$\\\\frac{v_1}{v_2} = \\\\sqrt{\\\\frac{M_2}{M_1}}$$", "explanation": "가벼운 가스가 더 빨리 퍼지는 원리를 설명합니다." },
+  { "id": "short-003", "question": "헨리의 법칙", "answer": "일정 온도에서 용매에 녹는 기체의 질량은 그 기체의 부분 압력에 비례함", "explanation": "탄산음료의 탄산 용해 원리입니다." },
+  { "id": "short-004", "question": "롤오버(Roll-over) 현상", "answer": "저장탱크 내 액상 가스가 층 분리 상태에서 급격히 혼합되며 다량의 증발가스가 발생하는 현상", "explanation": "대형 저장탱크의 압력 급증 사고 원인이 됩니다." },
+  { "id": "short-005", "question": "방류둑(Dike)의 정의", "answer": "액상 가스 누출 시 외부로의 유출을 방지하기 위해 저장 탱크 주위에 설치한 둑", "explanation": "2차 사고 방지를 위한 핵심 안전 시설입니다." },
+  { "id": "short-006", "question": "역화방지장치(Flame Arrester)의 역할", "answer": "배관 내 화염이 거꾸로 전파되는 것을 차단하여 설비를 보호함", "explanation": "수소나 아세틸렌 배관 등에 필수적입니다." },
+  { "id": "short-007", "question": "아보가드로의 법칙 핵심 수치", "answer": "표준상태(0℃, 1atm)에서 모든 기체 1mol의 부피는 22.4L", "explanation": "계산 문제의 기초가 되는 수치입니다." },
+  { "id": "short-008", "question": "돌턴의 부분압 법칙", "answer": "혼합 가스의 총 압력은 각 성분 가스의 부분 압력의 합과 같다", "explanation": "가스 조성 계산 시 사용됩니다." },
+  { "id": "short-009", "question": "파스칼의 법칙 원리", "answer": "밀폐 용기 내 유체에 가한 압력은 모든 방향으로 동일하게 전달됨", "explanation": "유압 장치나 액압식 기기의 기본 원리입니다." },
+  { "id": "short-010", "question": "헤스의 법칙", "answer": "화학 반응 전후의 열량 변화는 경로에 상관없이 일정하다", "explanation": "총 열량 불변의 법칙이라고도 합니다." },
+  { "id": "short-011", "question": "파일럿 버너(Pilot Burner)의 역할", "answer": "주버너를 안전하게 착화시키기 위한 작은 보조 불꽃", "explanation": "점화 실패로 인한 가스 사고를 예방합니다." },
+  { "id": "short-012", "question": "피어슨법(Pearson Method)의 용도", "answer": "지하 매설 배관의 피복 손상 부위를 지상에서 탐지하는 방법", "explanation": "굴착 없이 배관 건전성을 체크합니다." },
+  { "id": "short-013", "question": "보일 오프 가스(BOG)의 정의", "answer": "외부 열 유입으로 인해 탱크 내에서 자연적으로 증발하여 발생하는 가스", "explanation": "재액화하거나 연소 처리하여 압력을 조절해야 합니다." },
+  { "id": "short-014", "question": "직류전압 구배법의 목적", "answer": "매설 배관의 부식 및 피복 결함 지점을 전위 차로 확인", "explanation": "전기 방식 상태를 확인하는 정밀 검사법입니다." }
+]
