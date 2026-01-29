@@ -33,7 +33,8 @@ const App: React.FC = () => {
     setLoading(true);
     try {
       const allPromises = subIds.map(async (id) => {
-        const response = await fetch(`./json/${id}.json`);
+        // Updated to use the worker API endpoint
+        const response = await fetch(`/api/json/${id}`);
         if (response.ok) return await response.json();
         return [];
       });
