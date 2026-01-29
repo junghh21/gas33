@@ -40,9 +40,14 @@ const MarkdownRenderer: React.FC<Props> = ({ content, className = "" }) => {
           rootRef.current.innerHTML = rawHtml;
           
           // 2. Render Math in element
-          // We use a small timeout to ensure DOM layout is ready and document mode is checked
+          // Using a slightly longer timeout to ensure DOM settle and Standards Mode verification by KaTeX
           setTimeout(() => {
             if (isMounted && rootRef.current) {
+              // Verify Standards Mode (compatMode should be 'CSS1Compat')
+              if (document.compatMode !== 'CSS1Compat') {
+                console.warn("MarkdownRenderer: Document is in Quirks Mode. KaTeX may fail.");
+              }
+              
               try {
                 renderMathInElement(rootRef.current, {
                   delimiters: [
@@ -55,10 +60,10 @@ const MarkdownRenderer: React.FC<Props> = ({ content, className = "" }) => {
                   throwOnError: false
                 });
               } catch (mathErr) {
-                console.warn("KaTeX non-fatal error during auto-render:", mathErr);
+                console.error("KaTeX error during auto-render:", mathErr);
               }
             }
-          }, 10);
+          }, 30);
         }
       } catch (e) {
         console.error("Markdown parsing error:", e);

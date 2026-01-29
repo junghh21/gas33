@@ -16,6 +16,7 @@ export default {
         if (!id) throw new Error("Missing ID in URL");
         
         // Vite의 public 폴더에 저장된 파일은 루트 경로에서 바로 접근 가능합니다.
+        // /api/json/gas_general -> /json/gas_general.json
         const internalPath = `/json/${id}.json`;
         const internalUrl = new URL(internalPath, url.origin);
         
