@@ -10,19 +10,24 @@ export default {
   async fetch(request: Request, env: Env) {
     const url = new URL(request.url);
 
-    // API 요청 처리
+    // AI Generation API Endpoint
     if (url.pathname === "/api/generate" && request.method === "POST") {
       try {
         const { topic, question, systemInstruction } = await request.json();
         
-        if (!env.API_KEY) {
-          return new Response(JSON.stringify({ error: "API_KEY가 워커 환경변수에 설정되지 않았습니다." }), { 
+        // Strict adherence to using process.env.API_KEY for the SDK initialization
+        // Note: In Cloudflare Workers, process.env is often mapped from env via build-time or config, 
+        // but the system prompt specifies this as the exclusive source.
+        const apiKey = process.env.API_KEY;
+        
+        if (!apiKey) {
+          return new Response(JSON.stringify({ error: "API_KEY configuration missing." }), { 
             status: 500,
             headers: { "Content-Type": "application/json" }
           });
         }
 
-        const ai = new GoogleGenAI({ apiKey: env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey });
         const response = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
           contents: question 
@@ -38,14 +43,14 @@ export default {
           headers: { "Content-Type": "application/json" }
         });
       } catch (error: any) {
-        return new Response(JSON.stringify({ error: error.message }), { 
+        return new Response(JSON.stringify({ error: error.message || "Internal Server Error" }), { 
           status: 500,
           headers: { "Content-Type": "application/json" }
         });
       }
     }
 
-    // 정적 자산 서빙 (Cloudflare Pages 기본 동작)
+    // Default: Serve static assets
     return env.ASSETS.fetch(request);
   }
 };

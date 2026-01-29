@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>가스기사 학습 엔진 v2.5 [DEBUG MODE]</title>
+    <title>가스기사 학습 엔진 v2.5</title>
     <!-- Tailwind CSS (Play CDN) -->
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <!-- KaTeX CSS -->
@@ -29,50 +29,21 @@
 }
 </script>
 <script>
+    // Global error monitoring for debugging
     window.onerror = function(msg, url, lineNo, columnNo, error) {
-        showDebugError(`[JS ERROR] ${msg} (${lineNo}:${columnNo})`);
+        console.error(`[System Error] ${msg} at ${lineNo}:${columnNo}`);
+        const debug = document.getElementById('status-update');
+        if (debug) debug.innerText = "오류 발생: " + msg;
         return false;
     };
-    window.addEventListener('error', function(event) {
-        if (event.target.tagName === 'SCRIPT' || event.target.tagName === 'LINK') {
-            showDebugError(`[RESOURCE LOAD FAILED] ${event.target.src || event.target.href}`);
-        }
-    }, true);
-    window.addEventListener('unhandledrejection', function(event) {
-        showDebugError(`[PROMISE REJECTION] ${event.reason}`);
-    });
-    function showDebugError(message) {
-        console.error(message);
-        const debugDiv = document.getElementById('critical-debug');
-        if (debugDiv) {
-            debugDiv.style.display = 'block';
-            const errorItem = document.createElement('div');
-            errorItem.style.cssText = "background:#fee2e2; border:1px solid #ef4444; padding:8px; border-radius:6px; color:#b91c1c; font-family:monospace; font-size:11px; margin-bottom:5px; pointer-events:auto;";
-            errorItem.innerHTML = `<strong>ERR:</strong> ${message}`;
-            debugDiv.appendChild(errorItem);
-        }
-    }
-    console.log("[System] Debug monitor initialized.");
 </script>
 <style>
     .katex-display { margin: 1.5em 0; overflow-x: auto; padding-bottom: 0.5em; }
     .dark .katex { color: #e5e7eb; }
     body { opacity: 1; visibility: visible; }
-    #critical-debug { 
-        display: none; 
-        position: fixed; 
-        top: 10px; 
-        left: 10px; 
-        right: 10px; 
-        z-index: 99999; 
-        pointer-events: none; 
-        max-height: 50vh; 
-        overflow-y: auto;
-    }
 </style>
 </head>
 <body class="bg-gray-50 text-gray-900 font-sans">
-    <div id="critical-debug"></div>
     <div id="root">
         <div class="flex items-center justify-center min-h-screen">
             <div class="text-center">
@@ -82,5 +53,7 @@
             </div>
         </div>
     </div>
+    <!-- Explicitly load the entry point to bypass automatic import issues -->
+    <script type="module" src="./index.tsx"></script>
 </body>
 </html>
