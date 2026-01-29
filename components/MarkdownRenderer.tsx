@@ -1,7 +1,6 @@
 
 import React, { useEffect, useRef } from 'react';
 import { marked } from 'marked';
-import renderMathInElement from 'https://esm.sh/katex@0.16.9/dist/contrib/auto-render.mjs';
 
 interface Props {
   content: string;
@@ -28,7 +27,6 @@ const MarkdownRenderer: React.FC<Props> = ({ content, className = "" }) => {
         
         if (isMounted && rootRef.current) {
           rootRef.current.innerHTML = rawHtml;
-          applyKaTeX(rootRef.current);
         }
       } catch (e) {
         console.error("Markdown rendering error:", e);
@@ -44,24 +42,6 @@ const MarkdownRenderer: React.FC<Props> = ({ content, className = "" }) => {
       isMounted = false;
     };
   }, [content]);
-
-  const applyKaTeX = (element: HTMLElement) => {
-    if (!element) return;
-    try {
-      renderMathInElement(element, {
-        delimiters: [
-          { left: "$$", right: "$$", display: true },
-          { left: "$", right: "$", display: false },
-          { left: "\\(", right: "\\)", display: false },
-          { left: "\\[", right: "\\]", display: true }
-        ],
-        throwOnError: false,
-        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
-      });
-    } catch (err) {
-      console.warn("KaTeX auto-render failed:", err);
-    }
-  };
 
   return (
     <div 
