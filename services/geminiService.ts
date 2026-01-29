@@ -1,9 +1,20 @@
 
 import { GoogleGenAI } from "@google/genai";
 
+const getApiKey = () => {
+  const key = process.env.API_KEY;
+  if (!key) {
+    console.warn("API_KEY is missing in environment variables.");
+    return "";
+  }
+  return key;
+};
+
 export const generateExplanation = async (topic: string, question?: string) => {
-  // Always create a new instance to ensure we use the correct API key
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+  const apiKey = getApiKey();
+  if (!apiKey) return "API 키가 설정되지 않았습니다.";
+
+  const ai = new GoogleGenAI({ apiKey });
   const modelName = 'gemini-3-flash-preview';
   
   const systemInstruction = `
@@ -35,12 +46,13 @@ export const generateExplanation = async (topic: string, question?: string) => {
     return response.text || "답변을 생성하지 못했습니다.";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "AI 튜터와 연결하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+    return `AI 튜터와 연결하는 중 오류가 발생했습니다: ${error instanceof Error ? error.message : String(error)}`;
   }
 };
 
 export const startAIChat = (systemInstruction: string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
   return ai.chats.create({
     model: 'gemini-3-flash-preview',
     config: { systemInstruction }
