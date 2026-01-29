@@ -1,16 +1,39 @@
 
-import React, { useState } from 'react';
-import { ModuleId, ModuleInfo } from './types';
-import { MODULES, MOCK_DB, APP_VERSION } from './constants';
+import React, { useState, useEffect } from 'react';
+import { ModuleInfo, Flashcard } from './types';
+import { MODULES, APP_VERSION } from './constants';
 import FlashcardView from './components/FlashcardView';
 import AIChat from './components/AIChat';
 
 const App: React.FC = () => {
   const [selectedModule, setSelectedModule] = useState<ModuleInfo | null>(null);
   const [studyMode, setStudyMode] = useState<'selection' | 'flashcards' | 'ai'>('selection');
+  const [currentCards, setCurrentCards] = useState<Flashcard[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const startFlashcards = (module: ModuleInfo) => {
+  const fetchFlashcards = async (moduleId: string) => {
+    setLoading(true);
+    try {
+      // id를 기반으로 json/ 폴더의 파일 페칭
+      const response = await fetch(`./json/${moduleId}.json`);
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentCards(data);
+      } else {
+        console.error("Failed to load cards for:", moduleId);
+        setCurrentCards([]);
+      }
+    } catch (error) {
+      console.error("Error fetching flashcards:", error);
+      setCurrentCards([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startFlashcards = async (module: ModuleInfo) => {
     setSelectedModule(module);
+    await fetchFlashcards(module.id);
     setStudyMode('flashcards');
   };
 
@@ -22,6 +45,7 @@ const App: React.FC = () => {
   const handleBackToSelection = () => {
     setStudyMode('selection');
     setSelectedModule(null);
+    setCurrentCards([]);
   };
 
   return (
@@ -51,17 +75,9 @@ const App: React.FC = () => {
             >
               AI Tutor
             </button>
-            <a href="#" className="hover:text-blue-600 transition-colors">Resources</a>
+            <span className="text-gray-300">|</span>
+            <div className="text-blue-600 font-bold">총 {MODULES.length}개 과목</div>
           </div>
-
-          <button 
-             onClick={() => startAI()}
-             className="md:hidden p-2 text-gray-600"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-            </svg>
-          </button>
         </div>
       </header>
 
@@ -71,76 +87,69 @@ const App: React.FC = () => {
         {studyMode === 'selection' && (
           <div className="space-y-12">
             <div className="text-center max-w-2xl mx-auto">
-              <h2 className="text-4xl font-extrabold text-gray-900 mb-4 tracking-tight">가스기사 마스터 학습 엔진</h2>
-              <p className="text-gray-500 text-lg">최신 출제 경향을 반영한 과목별 핵심 요약과 AI 튜터링을 통해 자격증 합격에 도전하세요.</p>
+              <h2 className="text-4xl font-extrabold text-gray-900 mb-4 tracking-tight">가스기사 학습 엔진 v2.5</h2>
+              <p className="text-gray-500 text-lg">마크다운 기반 전처리 엔진이 추출한 {MODULES.reduce((acc, m) => acc + m.h4Count, 0)}개의 핵심 문항으로 완벽 대비하세요.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {MODULES.map((mod) => (
-                <div key={mod.id} className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-xl transition-all group overflow-hidden relative">
+                <div key={mod.id} className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-xl transition-all group overflow-hidden relative flex flex-col">
+                  <div className="absolute top-4 right-4 bg-blue-50 text-blue-600 text-[10px] font-bold px-2 py-1 rounded-full border border-blue-100">
+                    {mod.h4Count} 핵심
+                  </div>
                   <div className="text-4xl mb-4 transform group-hover:scale-125 transition-transform duration-300 inline-block">{mod.icon}</div>
                   <h3 className="text-xl font-bold mb-2 group-hover:text-blue-600 transition-colors">{mod.name}</h3>
-                  <p className="text-gray-500 text-sm mb-6 leading-relaxed h-16 overflow-hidden line-clamp-3">
+                  <p className="text-gray-500 text-xs mb-6 leading-relaxed flex-1">
                     {mod.description}
                   </p>
                   
                   <div className="space-y-3">
                     <button 
                       onClick={() => startFlashcards(mod)}
-                      className="w-full py-3 bg-blue-50 text-blue-700 font-bold rounded-xl hover:bg-blue-100 transition-all flex items-center justify-center space-x-2"
+                      className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all flex items-center justify-center space-x-2 shadow-sm"
                     >
-                      <span>플래시카드 학습</span>
+                      <span>학습 시작</span>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                       </svg>
                     </button>
                     <button 
                       onClick={() => startAI(mod)}
-                      className="w-full py-3 border border-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-50 transition-all text-sm"
+                      className="w-full py-2 border border-gray-100 text-gray-500 font-bold rounded-xl hover:bg-gray-50 transition-all text-[11px]"
                     >
-                      AI 상세 설명 보기
+                      AI 상세 설명
                     </button>
                   </div>
                 </div>
               ))}
-            </div>
-
-            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden">
-               <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-                 <div>
-                   <h3 className="text-2xl font-bold mb-2">실시간 AI 학습 지원</h3>
-                   <p className="opacity-90 max-w-lg">어려운 수식이나 복잡한 법규가 있으신가요? 제미나이 엔진 기반 AI가 24시간 실시간으로 설명해 드립니다.</p>
-                 </div>
-                 <button 
-                   onClick={() => startAI()}
-                   className="bg-white text-blue-700 px-8 py-4 rounded-2xl font-black text-lg shadow-xl hover:scale-105 transition-transform active:scale-95 whitespace-nowrap"
-                 >
-                   AI 튜터 시작하기
-                 </button>
-               </div>
-               <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
-               <div className="absolute bottom-0 left-0 w-32 h-32 bg-blue-400/20 rounded-full -ml-10 -mb-10 blur-2xl"></div>
             </div>
           </div>
         )}
 
         {studyMode === 'flashcards' && selectedModule && (
           <div className="space-y-6">
-             <div className="flex items-center space-x-2 mb-4">
-                <button 
-                  onClick={handleBackToSelection}
-                  className="p-2 hover:bg-gray-200 rounded-full transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                  </svg>
-                </button>
-                <h2 className="text-2xl font-black text-gray-800">{selectedModule.name} Flashcards</h2>
+             <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <button 
+                    onClick={handleBackToSelection}
+                    className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                  </button>
+                  <h2 className="text-2xl font-black text-gray-800">{selectedModule.name}</h2>
+                </div>
+                {loading && <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>}
              </div>
-             <FlashcardView 
-               cards={MOCK_DB[selectedModule.id] || []} 
-               onFinish={handleBackToSelection}
-             />
+             {!loading && currentCards.length > 0 ? (
+               <FlashcardView 
+                 cards={currentCards} 
+                 onFinish={handleBackToSelection}
+               />
+             ) : (
+               !loading && <div className="text-center py-20 text-gray-400">데이터를 불러오는 중이거나 파일이 없습니다.</div>
+             )}
           </div>
         )}
 
@@ -158,11 +167,6 @@ const App: React.FC = () => {
                   </button>
                   <h2 className="text-2xl font-black text-gray-800">가스기사 AI 튜터링</h2>
                 </div>
-                {selectedModule && (
-                  <div className="text-sm font-bold bg-blue-100 text-blue-700 px-4 py-1 rounded-full">
-                    Topic: {selectedModule.name}
-                  </div>
-                )}
              </div>
              <AIChat moduleName={selectedModule?.name} />
           </div>
@@ -171,12 +175,10 @@ const App: React.FC = () => {
 
       {/* Footer */}
       <footer className="bg-white border-t py-8 mt-12">
-        <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center text-gray-400 text-sm gap-4">
-          <p>© 2025 Gas Engineer Study Engine v2.5. All rights reserved.</p>
+        <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center text-gray-400 text-[11px] gap-4">
+          <p>© 2025 Gas Engineer Study Engine v2.5. Data Preprocessed with Heading 4 Analysis.</p>
           <div className="flex space-x-6">
-            <a href="#" className="hover:text-gray-600">Privacy Policy</a>
-            <a href="#" className="hover:text-gray-600">Terms of Service</a>
-            <a href="#" className="hover:text-gray-600">Contact</a>
+            <span>총 {MODULES.reduce((acc, m) => acc + m.h4Count, 0)}개의 핵심 체크포인트</span>
           </div>
         </div>
       </footer>
