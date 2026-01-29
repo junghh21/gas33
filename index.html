@@ -4,10 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>가스기사 학습 엔진 v2.5</title>
+    <title>가스기사 학습 엔진 v2.5 [DEBUG MODE]</title>
     <!-- Tailwind CSS (Play CDN) -->
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
-    <!-- KaTeX CSS - Improved security attributes to bypass tracking prevention -->
+    <!-- KaTeX CSS -->
     <link rel="stylesheet" 
           href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" 
           crossorigin="anonymous"
@@ -28,38 +28,43 @@
   }
 }
 </script>
+<script>
+    // 화면에 직접 오류를 출력하는 긴급 스크립트
+    window.onerror = function(msg, url, lineNo, columnNo, error) {
+        const debugDiv = document.getElementById('critical-debug');
+        if (debugDiv) {
+            debugDiv.style.display = 'block';
+            debugDiv.innerHTML = `
+                <div style="background:#fee2e2; border:2px solid #ef4444; padding:15px; border-radius:10px; color:#b91c1c; font-family:monospace; font-size:12px; margin-bottom:10px;">
+                    <strong>[JS CRITICAL ERROR]</strong><br/>
+                    메시지: ${msg}<br/>
+                    위치: ${lineNo}:${columnNo} @ ${url}
+                </div>
+            `;
+        }
+        return false;
+    };
+    console.log("[System] Debug monitor initialized.");
+</script>
 <style>
-    /* KaTeX 수식 모바일 가로 스크롤 대응 */
-    .katex-display {
-        margin: 1.5em 0;
-        overflow-x: auto;
-        overflow-y: hidden;
-        padding-bottom: 0.5em;
-    }
-    /* 다크 모드 수식 색상 강제 지정 */
-    .dark .katex {
-        color: #e5e7eb; /* gray-200 */
-    }
-    /* 마크다운 표(Table) 스타일 커스텀 */
-    .prose table {
-        width: 100%;
-        font-size: 0.875rem;
-    }
-    .prose thead th {
-        background-color: rgba(37, 99, 235, 0.05); /* blue-600/5 */
-    }
-    .dark .prose thead th {
-        background-color: rgba(37, 99, 235, 0.1);
-    }
-    /* Ensure body is visible and transitions smoothly */
-    body {
-        opacity: 1;
-        visibility: visible;
-        transition: opacity 0.3s ease;
-    }
+    .katex-display { margin: 1.5em 0; overflow-x: auto; padding-bottom: 0.5em; }
+    .dark .katex { color: #e5e7eb; }
+    body { opacity: 1; visibility: visible; }
+    #critical-debug { display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 9999; padding: 10px; pointer-events: none; }
+    #critical-debug * { pointer-events: auto; }
 </style>
 </head>
 <body class="bg-gray-50 text-gray-900 font-sans">
-    <div id="root"></div>
+    <div id="critical-debug"></div>
+    <div id="root">
+        <!-- JS 로드 전 사용자 안내 -->
+        <div class="flex items-center justify-center min-h-screen">
+            <div class="text-center">
+                <div class="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p class="text-gray-500 font-bold">애플리케이션 엔진 로딩 중...</p>
+                <p class="text-xs text-gray-400 mt-2">화면이 계속 멈춰있다면 콘솔(F12)을 확인하세요.</p>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
