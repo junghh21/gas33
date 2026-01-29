@@ -29,24 +29,18 @@
 }
 </script>
 <script>
-    // 1. 일반 JS 오류 핸들러
     window.onerror = function(msg, url, lineNo, columnNo, error) {
         showDebugError(`[JS ERROR] ${msg} (${lineNo}:${columnNo})`);
         return false;
     };
-
-    // 2. 모듈 로드(네트워크) 오류 핸들러 - 중요!
     window.addEventListener('error', function(event) {
         if (event.target.tagName === 'SCRIPT' || event.target.tagName === 'LINK') {
             showDebugError(`[RESOURCE LOAD FAILED] ${event.target.src || event.target.href}`);
         }
     }, true);
-
-    // 3. Promise 거부 핸들러
     window.addEventListener('unhandledrejection', function(event) {
         showDebugError(`[PROMISE REJECTION] ${event.reason}`);
     });
-
     function showDebugError(message) {
         console.error(message);
         const debugDiv = document.getElementById('critical-debug');

@@ -1,60 +1,39 @@
 
-import { GoogleGenAI } from "@google/genai";
-
-const getApiKey = () => {
-  const key = process.env.API_KEY;
-  if (!key) {
-    console.warn("API_KEY is missing in environment variables.");
-    return "";
-  }
-  return key;
-};
-
 export const generateExplanation = async (topic: string, question?: string) => {
-  const apiKey = getApiKey();
-  if (!apiKey) return "API 키가 설정되지 않았습니다.";
-
-  const ai = new GoogleGenAI({ apiKey });
-  const modelName = 'gemini-3-flash-preview';
-  
   const systemInstruction = `
     당신은 가스기사(Gas Engineer) 자격증 시험 전문 튜터입니다.
     사용자가 질문하는 가스 관련 기술 개념, 법규, 연소공학 수식 등을 전문적이고 이해하기 쉽게 설명하세요.
     
     [출력 가이드라인]
     1. 수식은 반드시 KaTeX 형식($ ... $ 또는 $$ ... $$)을 사용하세요.
-       - 예: 화학식 $CH_4$, 압력 공식 $P = \gamma h$
-       - 복잡한 공식은 반드시 $$ ... $$ 블록 형식을 사용하세요.
     2. 중요한 요약은 Markdown Table을 사용하여 가독성을 높이세요.
-    3. 단계별 설명이 필요한 경우 순서가 있는 리스트(1, 2, 3)를 사용하세요.
-    4. 답변은 Markdown 형식을 유지하세요.
+    3. 답변은 Markdown 형식을 유지하세요.
   `;
 
-  const prompt = question 
-    ? `'${topic}' 분야의 다음 질문에 대해 상세히 설명해줘: ${question}`
-    : `'${topic}'에 대한 핵심 요약 정리를 해줘.`;
-
   try {
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: prompt,
-      config: {
-        systemInstruction,
-        temperature: 0.7,
-      }
+    const response = await fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic, question, systemInstruction }),
     });
-    return response.text || "답변을 생성하지 못했습니다.";
+
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.error || "서버 응답 오류");
+    }
+
+    const data = await response.json();
+    return data.text || "답변을 생성하지 못했습니다.";
   } catch (error) {
-    console.error("Gemini API Error:", error);
+    console.error("Gemini API Proxy Error:", error);
     return `AI 튜터와 연결하는 중 오류가 발생했습니다: ${error instanceof Error ? error.message : String(error)}`;
   }
 };
 
+// Chat 기능도 필요한 경우 프록시로 구현해야 함. 현재는 generateExplanation 위주로 사용됨.
 export const startAIChat = (systemInstruction: string) => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
-  return ai.chats.create({
-    model: 'gemini-3-flash-preview',
-    config: { systemInstruction }
-  });
+  // 클라이언트 사이드 SDK는 보안상 권장되지 않으므로, 
+  // 실제 채팅 상태 유지는 서버 세션이나 별도 워커 로직이 필요합니다.
+  console.warn("Direct SDK Chat is deprecated. Use API endpoints instead.");
+  return null;
 };
