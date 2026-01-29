@@ -41,11 +41,12 @@ const App: React.FC = () => {
     }
   }, [isDarkMode]);
 
+  // Check engine readiness based on cache
   useEffect(() => {
     const checkCacheStatus = () => {
       const allSubIds = SUBJECTS.flatMap(s => s.subModuleIds);
       const cachedCount = allSubIds.filter(id => cardCache.current[id] && cardCache.current[id].length > 0).length;
-      if (cachedCount > 0 && cachedCount >= allSubIds.length * 0.7) { 
+      if (cachedCount > 0 && cachedCount >= allSubIds.length * 0.5) { 
         setIsEngineReady(true);
       }
     };
@@ -63,19 +64,26 @@ const App: React.FC = () => {
     try {
       const allPromises = missingIds.map(async (id) => {
         try {
-          // DIRECT LOAD: /api/json/ 대신 /json/*.json 경로로 직접 요청
-          const response = await fetch(`/json/${id}.json`);
+          // Try 1: Direct static fetch
+          let response = await fetch(`/json/${id}.json`);
+          
+          // Try 2: Fallback to Worker API if direct fails
+          if (!response.ok) {
+            console.warn(`[App] Direct fetch failed for ${id}, trying API fallback...`);
+            response = await fetch(`/api/json/${id}`);
+          }
+
           if (response.ok) {
             const data = await response.json();
             const cards = Array.isArray(data) ? data : [];
             cardCache.current[id] = cards;
             return cards;
           }
-          console.warn(`[App] Module ${id} fetch failed (Status: ${response.status})`);
+          
           cardCache.current[id] = [];
           return [];
         } catch (e) {
-          console.error(`[App] Network error for ${id}:`, e);
+          console.error(`[App] Fatal error loading ${id}:`, e);
           cardCache.current[id] = [];
           return [];
         }
@@ -96,7 +104,7 @@ const App: React.FC = () => {
     if (loading) return;
     const allCards = await fetchSubjectCards(subject.subModuleIds);
     if (allCards.length === 0) {
-      alert("데이터 로드에 실패했습니다. 파일 경로를 확인해주세요.");
+      alert("데이터를 로드할 수 없습니다. 연결 상태를 확인해주세요.");
       return;
     }
     setSelectedSubject(subject);
@@ -130,7 +138,7 @@ const App: React.FC = () => {
     
     if (allCards.length === 0) {
       setLoading(false);
-      alert("전체 학습 데이터를 불러오지 못했습니다. 서버 구성을 확인해주세요.");
+      alert("전체 학습 데이터를 불러오지 못했습니다. 엔진 상태를 확인해주세요.");
       return;
     }
 
@@ -214,7 +222,7 @@ const App: React.FC = () => {
                 <div className="w-12 h-12 border-[5px] border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                 <div className="text-center">
                   <p className="text-sm font-black text-gray-900 dark:text-white tracking-tight uppercase">Processing Engine</p>
-                  <p className="text-[10px] text-gray-500 font-bold mt-1">핵심 문항 데이터를 직접 로드 중입니다...</p>
+                  <p className="text-[10px] text-gray-500 font-bold mt-1">이중 로딩 시스템을 통해 최적의 데이터를 구성 중입니다...</p>
                 </div>
              </div>
           </div>

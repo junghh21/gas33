@@ -10,7 +10,35 @@ export default {
   async fetch(request: Request, env: Env) {
     const url = new URL(request.url);
 
-    // AI Generation API Endpoint (Keep for Gemini API)
+    // 1. JSON Data API Endpoint (Fallback for direct fetch)
+    if (url.pathname.startsWith("/api/json/")) {
+      try {
+        const id = url.pathname.split("/").pop();
+        if (!id) throw new Error("Missing ID");
+        
+        // Re-construct the internal asset path
+        const assetUrl = new URL(request.url);
+        assetUrl.pathname = `/json/${id}.json`;
+        
+        const assetResponse = await env.ASSETS.fetch(new Request(assetUrl.toString()));
+        
+        if (!assetResponse.ok) {
+          return new Response(JSON.stringify({ error: `Data file ${id} not found internally` }), { 
+            status: 404, 
+            headers: { "Content-Type": "application/json" } 
+          });
+        }
+
+        return assetResponse;
+      } catch (error: any) {
+        return new Response(JSON.stringify({ error: error.message }), { 
+          status: 500,
+          headers: { "Content-Type": "application/json" } 
+        });
+      }
+    }
+
+    // 2. AI Generation API Endpoint (Keep for Gemini API)
     if (url.pathname === "/api/generate" && request.method === "POST") {
       try {
         const { topic, question, systemInstruction } = await request.json();
@@ -46,7 +74,7 @@ export default {
       }
     }
 
-    // Default: Serve static assets including /json/*.json
+    // Default: Serve static assets (This includes /json/*.json)
     return env.ASSETS.fetch(request);
   }
 };
