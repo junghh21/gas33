@@ -1,6 +1,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { marked } from 'marked';
+import renderMathInElement from 'katex-autorender';
 
 interface Props {
   content: string;
@@ -16,7 +17,6 @@ const MarkdownRenderer: React.FC<Props> = ({ content, className = "" }) => {
     const renderContent = async () => {
       if (!rootRef.current) return;
 
-      // marked configuration
       marked.setOptions({
         breaks: true,
         gfm: true
@@ -27,6 +27,17 @@ const MarkdownRenderer: React.FC<Props> = ({ content, className = "" }) => {
         
         if (isMounted && rootRef.current) {
           rootRef.current.innerHTML = rawHtml;
+          
+          // KaTeX rendering
+          renderMathInElement(rootRef.current, {
+            delimiters: [
+              { left: "$$", right: "$$", display: true },
+              { left: "$", right: "$", display: false },
+              { left: "\\(", right: "\\)", display: false },
+              { left: "\\[", right: "\\]", display: true }
+            ],
+            throwOnError: false
+          });
         }
       } catch (e) {
         console.error("Markdown rendering error:", e);

@@ -1,7 +1,5 @@
 {
-  "name": "https://gas33.pages.dev",
-  "description": "An advanced learning platform for Gas Engineer certification, featuring flashcards, LaTeX support for chemical formulas, and an integrated Gemini AI tutor.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
+  "name": "가스기사 학습 엔진 v2.5",
+  "description": "가스기사 자격증 학습을 위한 AI 튜터 기반 플래시카드 엔진. Markdown 및 LaTeX 수식 지원.",
+  "requestFramePermissions": []
 }
